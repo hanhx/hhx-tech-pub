@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一张图讲清楚：Windsurf 记忆 + 上下文 + RAG 是怎么配合的？</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+      background:
+              radial-gradient(circle at top left, rgba(52,152,219,0.10), transparent 28%),
+              radial-gradient(circle at bottom right, rgba(155,89,182,0.08), transparent 28%),
+              linear-gradient(135deg, #f6f8fb, #eef3f9);
+      color: #1f2d3d;
+      height: 100vh;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+    .slide {
+      width: 96vw;
+      max-width: 1400px;
+      height: 92vh;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(120,140,160,0.18);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(31,45,61,0.12);
+      padding: 18px 24px 14px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 10px;
+      backdrop-filter: blur(8px);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      border-bottom: 1px solid #e8eef5;
+      padding-bottom: 8px;
+    }
+    .title-wrap h1 {
+      font-size: 26px;
+      line-height: 1.2;
+      color: #102235;
+      margin-bottom: 4px;
+      letter-spacing: 0.2px;
+    }
+    .title-wrap h1 span { color: #0f62fe; }
+    .title-wrap p { font-size: 15px; color: #5d6b7a; }
+    .tag-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .tag {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: linear-gradient(135deg,#0f62fe,#4b8dff);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.18);
+    }
+    .disclaimer {
+      font-size: 11px;
+      color: #5b6b7c;
+      line-height: 1.4;
+      text-align: right;
+      font-style: italic;
+    }
+    .summary {
+      background: linear-gradient(135deg,#103a5c,#155b8b);
+      color: #fff;
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .summary-label {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .summary-content { flex: 1; }
+    .summary-main {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.45;
+      color: #fff;
+    }
+    .summary-sub {
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.35;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .highlight { color: #fef08a; }
+    .summary-tagline {
+      font-size: 11px;
+      opacity: 0.9;
+      max-width: 280px;
+      text-align: right;
+    }
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 12px;
+      min-height: 0;
+      overflow: visible;
+    }
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+    }
+    .left-column .card {
+      flex: 1;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 14px 16px 12px;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.06);
+      border: 1px solid #edf2f7;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: auto;
+    }
+    .card.left { border-top: 4px solid #f97316; }
+    .card.center { border-top: 4px solid #22c55e; }
+    .card.right { border-top: 4px solid #4c9aff; }
+    .card h2 { font-size: 15px; margin-bottom: 6px; color: #12263a; }
+    .card .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+    .card ul {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #334155;
+    }
+    .card li strong { color: #0f172a; }
+    .good-text { color: #16a34a; }
+    .funnel-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 0;
+      gap: 4px;
+    }
+    .funnel-layer {
+      text-align: center;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+      border: 1px solid rgba(0,0,0,0.1);
+      transition: transform 0.3s;
+    }
+    .funnel-layer:hover { transform: scale(1.02); }
+    .layer-1 { width: 100%; background: #f1f5f9; color: #334155; }
+    .layer-2 { width: 90%; background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+    .layer-3 { width: 80%; background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+    .layer-4 {
+      width: 65%;
+      background: #103a5c;
+      color: #93c5fd;
+      box-shadow: 0 8px 20px rgba(16,58,92,0.3);
+      border-color: #93c5fd;
+    }
+    .funnel-layer strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 1px;
+    }
+    .funnel-layer .desc {
+      font-size: 11px;
+      font-weight: 500;
+      opacity: 0.9;
+    }
+    .funnel-arrow { font-size: 11px; color: #94a3b8; line-height: 1; }
+    .bottom-section {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .analogy-bar {
+      background: linear-gradient(to right,#f8fafc,#f1f5f9);
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #64748b;
+      border-radius: 14px;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .analogy-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #b45309;
+      margin-bottom: 6px;
+    }
+    .analogy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .analogy-item {
+      font-size: 11px;
+      color: #334155;
+      background: #fff;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+    .analogy-item strong {
+      color: #64748b;
+      display: block;
+      margin-bottom: 2px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .analogy-item.highlight { border-color: #93c5fd; background: #eff6ff; }
+    .analogy-item.highlight strong { color: #2563eb; }
+    .analogy-note {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 6px;
+    }
+    .takeaway {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #edf2f7;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.05);
+      padding: 8px 12px;
+    }
+    .takeaway h3 { font-size: 13px; margin-bottom: 4px; color: #12263a; font-weight: 700; }
+    .takeaway .quote {
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .takeaway .note {
+      font-size: 11px;
+      color: #5b6b7c;
+      line-height: 1.4;
+    }
+    .export-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg,#0f62fe,#4b8dff);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.3);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    .export-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(15,98,254,0.4);
+    }
+    .export-btn:active { transform: translateY(0); }
+    .home-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.95);
+      color: #0f62fe;
+      border: 2px solid #0f62fe;
+      border-radius: 50%;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15,98,254,0.15);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .home-btn:hover {
+      background: #0f62fe;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(15,98,254,0.25);
+    }
+    .home-btn:active { transform: translateY(0); }
+
+    @media (max-width: 1100px) {
+      .slide { height: auto; min-height: 92vh; overflow: auto; }
+      .main, .bottom-section { grid-template-columns: 1fr; }
+      .analogy-grid { grid-template-columns: 1fr; }
+      .card { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+<a href="../../index.html" class="home-btn">←</a>
+
+<div class="slide">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="title-wrap">
+      <h1>一张图讲清楚：商用 <span>Windsurf</span> 是如何做到「既记得住，又不乱看」的？</h1>
+    </div>
+    <div class="tag-wrap">
+      <div class="tag">架构对标解析 03 · Memory × Context </div>
+      <div class="disclaimer">基于公开资料与社区技术文章整理，仅为架构抽象示意</div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="summary-label">🎯 顶层结论：</div>
+    <div class="summary-content">
+      <div class="summary-main">Windsurf 接受「有控制的遗忘」，用记忆模块决定长期要留什么，用上下文引擎决定这一步要看什么。</div>
+      <div class="summary-sub">lossless‑claw 则尽量「不遗忘」，靠全量归档 + DAG 保证以后随时还能把原文翻回来。</div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main">
+
+    <!-- 左列：记忆生成 + 记忆读取 -->
+    <div class="left-column">
+      <div class="card left">
+        <h2>① 记忆生成：长期要留下什么？（不囤原文）</h2>
+        <ul>
+          <li><strong>自动记忆：</strong>
+            当对话里出现架构决策、约束条件、命名约定时，Cascade 会在后台生成一条结构化 Memory，挂在当前 Workspace 下面。
+          </li>
+          <li><strong>主动记忆：</strong>
+            手动把某条信息钉进 Workspace 级的记忆库，不完全依赖模型自己判断该记啥。
+          </li>
+          <li><strong>记忆隔离：</strong>
+            按 Workspace 隔离、本地存储，每个工程有自己的一组 Memories / Rules，存在本地配置目录，不进仓库、不串项目。
+          </li>
+        </ul>
+      </div>
+
+      <div class="card center">
+        <h2>② 记忆读取：这一轮要用哪几条？</h2>
+        <ul>
+          <li><strong>结合语义 + 工程状态算相关性：</strong>
+            看这一轮的提问、光标位置、当前文件、报错栈等，对所有 Memories / Rules 做相关度打分。
+          </li>
+          <li><strong>只留下少量高相关摘要：</strong>
+            不把整库记忆都塞回去，只保留和当前任务强相关的那几条，形成一个「记忆候选集」。
+          </li>
+          <li><strong>只负责「选料」，不负责「怎么用」：</strong>
+            这一层只决定用哪些记忆，至于是进 System Prompt、还是当作工具结果，留给下一步 RAG 上下文引擎来安排。
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 右列：上下文引擎（代码 + 记忆 + RAG） -->
+    <div class="card right">
+      <h2>③ RAG 上下文引擎：Local Index + 代码 + 记忆 → 模型真正能看到的那 1%</h2>
+
+      <div class="funnel-container">
+        <div class="funnel-layer layer-1">
+          <strong>1. What Context：先看人现在在干嘛</strong>
+          <span class="desc">观察光标、当前文件、Stack Trace、最近编辑、终端输出，先划定「大概在哪一片代码区域找答案」。</span>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-layer layer-2">
+          <strong>2. Fast Context（RAG 检索 · Local Index）</strong>
+          <span class="desc">在为整个仓库构建好的 Local Index 上，由 Fast Context 子代理（SWE‑grep / SWE‑grep‑mini）发起多轮、并行的代码检索，从代码库中快速筛出一批候选文件和代码片段。</span>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-layer layer-3">
+          <strong>3. SWE‑1 Swarm：调用链分析 + 语义重排</strong>
+          <span class="desc">沿调用链和依赖关系分析，再结合语义相似度，把大量「可能相关」的候选片段压成那 1%「非看不可」的代码、配置，并把②给出的少量记忆摘要一起打包成上下文候选。</span>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-layer layer-4">
+          <strong>4. Frontier 模型：在精简上下文里做最终决策</strong>
+          <span class="desc">Claude Opus 4.6 / SWE‑1.5 只在这 1% 高信息密度上下文里做规划、重构、解释、找根因，而不是亲自从零翻整仓库和整库记忆。</span>
+        </div>
+      </div>
+      <p style="font-size: 11px; color: #64748b; text-align: center; margin-top: 4px;">
+        粗暴理解：<span class="good-text">先由本地索引 + 小模型 + 中间层模型按「目的」帮你选好代码 + 记忆，再让大模型在精简上下文里动昂贵算力。</span>
+      </p>
+    </div>
+
+  </div>
+
+  <!-- Bottom Section: Compare + Takeaway -->
+  <div class="bottom-section">
+    <div class="analogy-bar">
+      <div class="analogy-title">💡 终极对比：lossless‑claw 把「上下文 = 记忆」，Windsurf 把「记忆」和「RAG 上下文」拆开配合用</div>
+      <div class="analogy-grid">
+        <div class="analogy-item">
+          <strong>Lossless-claw（全量归档 · 开源）</strong>
+          路线：上下文 = 记忆 = 历史——所有对话原文都写进 SQLite，用 DAG 把因果串一遍，后面靠工具帮模型「翻档案」。<br>
+          适用：需要「可审计 / 可迁移 / 可回放」的长期项目档案。
+        </div>
+        <div class="analogy-item highlight">
+          <strong>Windsurf（记忆 + RAG 上下文解耦 · 商业）</strong>
+          路线：记忆模块负责「存摘要」，RAG 上下文引擎负责「在 Local Index 上检索 + 重排代码片段，并按需注入少量记忆」，最后交给 Frontier 模型思考。<br>
+          适用：追求「顺手体验 + 低延迟 + 成本可控」的一线开发场景。
+        </div>
+      </div>
+      <div class="analogy-note">
+        从左到右，就是 Windsurf 这一条线：<strong>先决定记什么 → 每一轮从记忆里挑什么 → 再在 Local Index 上用 RAG 选代码 + 注入记忆 → 一起喂给大模型</strong>。
+      </div>
+    </div>
+
+    <div class="takeaway">
+      <h3>🎯 一句话带走</h3>
+      <div class="quote">
+        lossless‑claw 想的是「别丢任何一段历史」，Windsurf 想的是「每一步只让模型看到最有用的那一点点上下文」。
+      </div>
+      <div class="note">
+        如果你来设计记忆 & 上下文，你会如何考虑？
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<button class="export-btn" onclick="exportAsImage()">📸 导出为图片</button>
+
+<script>
+  async function exportAsImage() {
+    const button = document.querySelector('.export-btn');
+    button.textContent = '生成中...';
+    button.disabled = true;
+
+    try {
+      const slideElement = document.querySelector('.slide');
+      const canvas = await html2canvas(slideElement, {
+        scale: 2,
+        backgroundColor: null,
+        logging: false,
+        useCORS: true
+      });
+
+      const link = document.createElement('a');
+      link.download = 'Windsurf-记忆-上下文-RAG-一张图讲清楚.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      button.textContent = '✅ 导出成功';
+      setTimeout(() => {
+        button.textContent = '📸 导出为图片';
+        button.disabled = false;
+      }, 2000);
+    } catch (error) {
+      console.error('导出失败:', error);
+      button.textContent = '❌ 导出失败';
+      setTimeout(() => {
+        button.textContent = '📸 导出为图片';
+        button.disabled = false;
+      }, 2000);
+    }
+  }
+</script>
+</body>
+</html>

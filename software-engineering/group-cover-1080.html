@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>软件工程新范式 封面（1080x1080）</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+      background: #0b0c10;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .export-header { width: 1080px; display: flex; justify-content: space-between; align-items: center; }
+    .export-label { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: 0.5px; }
+    .export-btn {
+      background: linear-gradient(135deg,#00d2ff,#3a7bd5);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(0,210,255,0.25);
+    }
+
+    .cover {
+      width: 1080px;
+      height: 1080px;
+      position: relative;
+      overflow: hidden;
+      border: 3px solid rgba(255,255,255,0.08);
+      box-shadow: 0 26px 70px rgba(0,0,0,0.55);
+      background:
+        radial-gradient(1200px 900px at 20% 15%, rgba(0,210,255,0.22) 0%, rgba(0,210,255,0) 55%),
+        radial-gradient(900px 900px at 85% 80%, rgba(255,51,102,0.18) 0%, rgba(255,51,102,0) 52%),
+        radial-gradient(circle at 50% 30%, #171a2a 0%, #0b0c10 70%);
+    }
+
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.045) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(255,255,255,0.045) 2px, transparent 2px);
+      background-size: 72px 72px;
+      opacity: 0.8;
+      z-index: 1;
+    }
+
+    .noise {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06) 0, rgba(255,255,255,0) 40%),
+        radial-gradient(circle at 80% 20%, rgba(255,255,255,0.05) 0, rgba(255,255,255,0) 45%),
+        radial-gradient(circle at 70% 85%, rgba(255,255,255,0.05) 0, rgba(255,255,255,0) 48%);
+      mix-blend-mode: overlay;
+      opacity: 0.55;
+      z-index: 2;
+    }
+
+    .glow-top {
+      position: absolute;
+      top: -220px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 980px;
+      height: 620px;
+      background: radial-gradient(ellipse at center, rgba(0, 210, 255, 0.35) 0%, transparent 70%);
+      z-index: 2;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.06);
+      z-index: 2;
+    }
+    .ring.r1 { width: 860px; height: 860px; right: -280px; top: -220px; }
+    .ring.r2 { width: 1180px; height: 1180px; left: -520px; bottom: -520px; }
+
+    .circuit {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: 0.9;
+      pointer-events: none;
+    }
+
+    .layer {
+      position: relative;
+      z-index: 10;
+      height: 100%;
+      padding: 74px 80px 70px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tag {
+      align-self: flex-start;
+      display: inline-flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 22px;
+      border-radius: 999px;
+      color: #fff;
+      font-weight: 900;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, rgba(255,51,102,0.95), rgba(255,123,0,0.95));
+      border: 2px solid rgba(255,255,255,0.42);
+      box-shadow: 0 14px 34px rgba(255,51,102,0.25);
+      font-size: 22px;
+    }
+    .tag .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.95);
+      box-shadow: 0 0 0 6px rgba(255,255,255,0.18);
+    }
+
+    .title {
+      margin-top: 62px;
+      color: #fff;
+      font-weight: 950;
+      letter-spacing: 3px;
+      line-height: 1.12;
+      text-shadow: 0 12px 44px rgba(0,0,0,0.85);
+      font-size: 84px;
+    }
+
+    .title .en {
+      display: block;
+      font-size: 42px;
+      letter-spacing: 7px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 18px;
+    }
+
+    .title .hl {
+      display: inline-block;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 18px rgba(0,210,255,0.55));
+    }
+
+    .subtitle {
+      margin-top: 26px;
+      font-size: 34px;
+      font-weight: 800;
+      color: rgba(241,245,249,0.92);
+      letter-spacing: 2px;
+    }
+
+    .points {
+      margin-top: 56px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      padding: 30px 32px;
+      border-radius: 26px;
+      background: rgba(255,255,255,0.06);
+      border: 2px solid rgba(0,210,255,0.26);
+      backdrop-filter: blur(18px);
+      box-shadow: inset 0 0 40px rgba(0,210,255,0.08);
+      width: 100%;
+    }
+
+    .point {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .badge {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 950;
+      font-size: 26px;
+      color: #ff3366;
+      background: rgba(255,51,102,0.14);
+      border: 3px solid rgba(255,51,102,0.85);
+      flex-shrink: 0;
+    }
+
+    .point span {
+      font-size: 34px;
+      font-weight: 900;
+      color: rgba(241,245,249,0.95);
+      letter-spacing: 1.2px;
+    }
+    .point span b {
+      color: #00d2ff;
+      font-weight: 950;
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+      padding-top: 26px;
+      border-top: 2px dashed rgba(0,210,255,0.25);
+    }
+
+    .punch {
+      font-size: 42px;
+      font-weight: 950;
+      letter-spacing: 4px;
+      color: #00d2ff;
+      text-shadow: 0 0 26px rgba(0,210,255,0.55);
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+      color: rgba(255,255,255,0.78);
+      font-weight: 800;
+      letter-spacing: 0.6px;
+    }
+
+    .meta .line {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.42);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(10px);
+      font-size: 16px;
+    }
+
+    .meta .k {
+      color: rgba(255,255,255,0.62);
+      font-weight: 900;
+    }
+
+    .meta .v {
+      color: rgba(255,255,255,0.92);
+      font-weight: 950;
+    }
+  </style>
+</head>
+<body>
+  <div class="export-header">
+    <div class="export-label">🧩 1080x1080 封面</div>
+    <button class="export-btn" onclick="exportCover('cover','group-cover-1080.jpg')">导出 JPG（<5MB）</button>
+  </div>
+
+  <div class="cover" id="cover">
+    <div class="glow-top"></div>
+    <div class="grid-bg"></div>
+    <div class="noise"></div>
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+
+    <svg class="circuit" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#00d2ff" stop-opacity="0.85" />
+          <stop offset="1" stop-color="#3a7bd5" stop-opacity="0.35" />
+        </linearGradient>
+        <linearGradient id="g2" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ff3366" stop-opacity="0.65" />
+          <stop offset="1" stop-color="#ff7b00" stop-opacity="0.20" />
+        </linearGradient>
+        <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      <g filter="url(#softGlow)">
+        <path d="M140 220 H430 V310 H620" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round" />
+        <circle cx="140" cy="220" r="8" fill="#00d2ff" fill-opacity="0.9" />
+        <circle cx="430" cy="310" r="8" fill="#00d2ff" fill-opacity="0.8" />
+        <circle cx="620" cy="310" r="7" fill="#3a7bd5" fill-opacity="0.7" />
+
+        <path d="M930 330 H760 V460 H610" fill="none" stroke="url(#g2)" stroke-width="4" stroke-linecap="round" />
+        <circle cx="930" cy="330" r="8" fill="#ff3366" fill-opacity="0.75" />
+        <circle cx="760" cy="460" r="7" fill="#ff3366" fill-opacity="0.55" />
+
+        <path d="M160 820 H360 V700 H520 V610" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round" />
+        <circle cx="160" cy="820" r="8" fill="#00d2ff" fill-opacity="0.75" />
+        <circle cx="360" cy="700" r="7" fill="#00d2ff" fill-opacity="0.55" />
+        <circle cx="520" cy="610" r="6" fill="#3a7bd5" fill-opacity="0.55" />
+
+        <path d="M940 860 H800 V760 H720" fill="none" stroke="url(#g2)" stroke-width="4" stroke-linecap="round" />
+        <circle cx="940" cy="860" r="8" fill="#ff3366" fill-opacity="0.6" />
+        <circle cx="800" cy="760" r="7" fill="#ff7b00" fill-opacity="0.45" />
+        <circle cx="720" cy="760" r="6" fill="#ff3366" fill-opacity="0.35" />
+
+        <path d="M540 160 V250" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="3" stroke-linecap="round" />
+        <circle cx="540" cy="160" r="7" fill="rgba(255,255,255,0.25)" />
+        <circle cx="540" cy="250" r="6" fill="rgba(0,210,255,0.55)" />
+      </g>
+
+      <g opacity="0.35">
+        <path d="M0 540 H1080" stroke="rgba(255,255,255,0.06)" stroke-width="2" />
+        <path d="M540 0 V1080" stroke="rgba(255,255,255,0.06)" stroke-width="2" />
+      </g>
+    </svg>
+
+    <div class="layer">
+      <div class="tag"><span class="dot"></span><span>软件工程 · 新范式</span></div>
+
+      <div class="title">
+        <span class="en">SOFTWARE ENGINEERING</span>
+        <span class="hl">新范式</span>
+      </div>
+
+      <div class="subtitle">规范驱动 + 工具闭环 + 工程基础设施：把交付变成可验证的系统</div>
+
+      <div class="points">
+        <div class="point"><div class="badge">01</div><span><b>规范</b>：把关键决策写成“单一真相源”（Spec/契约/边界）</span></div>
+        <div class="point"><div class="badge">02</div><span><b>闭环</b>：从需求到验证，打通信息/接口/数据，持续可回归</span></div>
+        <div class="point"><div class="badge">03</div><span><b>基础设施</b>：像 Harness 一样把约束装进脚手架，让系统自洽运行</span></div>
+      </div>
+
+      <div class="footer">
+        <div class="punch">从“写代码”到“交付系统”</div>
+        <div class="meta">
+          <div class="line"><span class="k">尺寸</span><span class="v">1080×1080</span></div>
+          <div class="line"><span class="k">合集</span><span class="v">软件工程新范式</span></div>
+          <div class="line"><span class="k">系列</span><span class="v">one-page-tech</span></div>
+          <div class="line"><span class="k">版本</span><span class="v">v1</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function exportCover(id, fn) {
+      const el = document.getElementById(id);
+      const btn = event.target;
+      const ot = btn.textContent;
+      const MAX = 5 * 1024 * 1024;
+
+      btn.textContent = '导出中...';
+      btn.disabled = true;
+
+      const attempts = [
+        { scale: 2, quality: 0.9 },
+        { scale: 2, quality: 0.82 },
+        { scale: 1.8, quality: 0.8 },
+        { scale: 1.6, quality: 0.78 },
+        { scale: 1.5, quality: 0.75 },
+      ];
+
+      try {
+        for (let i = 0; i < attempts.length; i++) {
+          const { scale, quality } = attempts[i];
+          btn.textContent = `导出中... (${i + 1}/${attempts.length})`;
+
+          const c = await html2canvas(el, {
+            scale,
+            backgroundColor: '#0b0c10',
+            logging: false,
+            useCORS: true,
+          });
+
+          const blob = await new Promise((resolve) =>
+            c.toBlob((b) => resolve(b), 'image/jpeg', quality)
+          );
+
+          if (!blob) continue;
+          if (blob.size > MAX && i < attempts.length - 1) continue;
+
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.download = fn;
+          a.href = u;
+          a.click();
+          URL.revokeObjectURL(u);
+
+          btn.textContent = blob.size <= MAX ? '✅ 导出成功' : '⚠️ 已导出（可能>5MB）';
+          setTimeout(() => {
+            btn.textContent = ot;
+            btn.disabled = false;
+          }, 1800);
+          return;
+        }
+
+        btn.textContent = '❌ 失败';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 1600);
+      } catch (e) {
+        btn.textContent = '❌ 失败';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 1600);
+      }
+    }
+  </script>
+</body>
+</html>

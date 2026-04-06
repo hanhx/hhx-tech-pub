@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一页图讲清楚系列 - AI 硬核技术图解</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sw: 260px;
+      --sw-col: 64px;
+      --dur: 0.24s;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0d1117;
+      --surface: #111820;
+      --surface2: #161d27;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.12);
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --text-faint: rgba(255,255,255,0.28);
+      --cyan: #00d2ff;
+      --cyan-bg: rgba(0,210,255,0.09);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245,158,11,0.1);
+      --green: #4ade80;
+      --green-bg: rgba(74,222,128,0.1);
+      --grid: rgba(255,255,255,0.025);
+      --glow-a: rgba(0,210,255,0.12);
+      --glow-b: rgba(139,92,246,0.1);
+      --shadow: 0 2px 12px rgba(0,0,0,0.5);
+    }
+
+    [data-theme="light"] {
+      --bg: #f4f1ea;
+      --surface: #fffdf8;
+      --surface2: #f0e4da;
+      --border: #d8cec3;
+      --border2: #c4b8ad;
+      --text: #201b18;
+      --text-muted: #6d645d;
+      --text-faint: rgba(32,27,24,0.35);
+      --cyan: #955f3b;
+      --cyan-bg: rgba(149,95,59,0.08);
+      --amber: #955f3b;
+      --amber-bg: rgba(149,95,59,0.08);
+      --green: #3a7d44;
+      --green-bg: rgba(58,125,68,0.08);
+      --grid: rgba(32,27,24,0.03);
+      --glow-a: rgba(149,95,59,0.06);
+      --glow-b: rgba(149,95,59,0.04);
+      --shadow: 0 18px 40px rgb(54 40 23 / 0.08);
+      --shadow-hover: 0 22px 44px rgb(54 40 23 / 0.13);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      transition: background var(--dur), color var(--dur);
+    }
+    [data-theme="light"] body {
+      background: radial-gradient(circle at top, #fff8f1 0, #f4f1ea 42%, #efe8de 100%);
+      background-color: #efe8de;
+      background-repeat: no-repeat;
+    }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(circle at 15% 0%, var(--glow-a), transparent 40%),
+        radial-gradient(circle at 85% 100%, var(--glow-b), transparent 40%);
+    }
+
+    .sidebar {
+      width: var(--sw);
+      min-height: 100vh;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 200;
+      overflow: hidden;
+      transition: width var(--dur), transform var(--dur), background var(--dur), border-color var(--dur);
+      flex-shrink: 0;
+    }
+    .sidebar.collapsed { width: var(--sw-col); }
+
+    .sb-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 24px 18px 20px;
+      border-bottom: 1px solid var(--border);
+      min-height: 80px;
+      overflow: hidden;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .sb-icon {
+      width: 34px; height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--cyan), #3a7bd5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+      box-shadow: 0 3px 10px rgba(0,210,255,0.25);
+      transition: box-shadow var(--dur);
+    }
+    [data-theme="light"] .sb-icon { box-shadow: 0 3px 10px rgba(2,132,199,0.2); }
+    .sb-text { overflow: hidden; }
+    .sb-en {
+      font-size: 9px; letter-spacing: 2.5px; color: var(--cyan);
+      text-transform: uppercase; font-weight: 700; margin-bottom: 3px;
+    }
+    .sb-zh { font-size: 13px; font-weight: 800; color: var(--text); }
+    .sidebar.collapsed .sb-text { display: none; }
+
+    .sb-nav { flex: 1; padding: 14px 0; overflow-y: auto; overflow-x: hidden; }
+    .sb-nav-label {
+      font-size: 9px; letter-spacing: 2px; color: var(--text-faint);
+      text-transform: uppercase; padding: 8px 18px 5px;
+      white-space: nowrap; overflow: hidden;
+      transition: opacity var(--dur);
+    }
+    .sidebar.collapsed .sb-nav-label { opacity: 0; }
+
+    .sb-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px;
+      font-size: 13px; color: var(--text-muted);
+      cursor: pointer; border: none; background: none;
+      width: 100%; text-align: left;
+      transition: color 0.15s, background 0.15s;
+      white-space: nowrap; overflow: hidden;
+      border-right: 2px solid transparent;
+      text-decoration: none;
+    }
+    .sb-item:hover { color: var(--text); background: rgba(128,128,128,0.07); }
+    .sb-item.active { color: var(--cyan); border-right-color: var(--cyan); background: var(--cyan-bg); }
+
+    .sb-ico {
+      width: 22px; height: 22px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
+    .sb-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .sb-count {
+      font-size: 10px; background: rgba(128,128,128,0.1);
+      padding: 1px 6px; border-radius: 4px; color: var(--text-faint);
+      flex-shrink: 0;
+    }
+    .sidebar.collapsed .sb-label,
+    .sidebar.collapsed .sb-count { display: none; }
+    .sidebar.collapsed .sb-item { justify-content: center; padding: 9px 0; }
+
+    .sb-bottom {
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .sb-toggle {
+      position: fixed;
+      top: 24px;
+      left: calc(var(--sw) - 14px);
+      width: 28px; height: 28px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      z-index: 300;
+      color: var(--text-muted);
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      transition: left var(--dur), background var(--dur), color 0.15s;
+      user-select: none;
+    }
+    .sb-toggle:hover { background: var(--surface2); color: var(--text); }
+    .sb-toggle.is-col { left: calc(var(--sw-col) - 14px); }
+
+    .sb-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 150;
+    }
+    .sb-overlay.show { display: block; }
+
+    .main {
+      margin-left: var(--sw);
+      flex: 1;
+      padding: 0;
+      position: relative; z-index: 1;
+      transition: margin-left var(--dur);
+    }
+    .main.wide { margin-left: var(--sw-col); }
+    .main-wrap { padding: 48px 56px 80px; }
+
+    .topbar {
+      display: flex; justify-content: flex-end;
+      gap: 8px; margin-bottom: 36px;
+    }
+    .tb-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 13px;
+      background: var(--surface); color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .tb-btn:hover { color: var(--text); border-color: var(--border2); background: var(--surface2); }
+
+    .page-hd {
+      margin-bottom: 48px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-eyebrow {
+      font-size: 10px; letter-spacing: 3px; color: var(--cyan);
+      text-transform: uppercase; font-weight: 700; margin-bottom: 10px;
+    }
+    .page-title {
+      font-size: 32px; font-weight: 900; color: var(--text);
+      line-height: 1.2; margin-bottom: 10px;
+    }
+    [data-theme="light"] .page-title { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+    .page-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+
+    .section { margin-bottom: 56px; }
+    [data-theme="light"] .section {
+      padding: 20px 22px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--surface) 92%, white 8%);
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+    [data-theme="light"] .section:hover {
+      box-shadow: var(--shadow-hover);
+      border-color: color-mix(in srgb, var(--cyan) 25%, var(--border) 75%);
+    }
+    .sec-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 13px; margin-bottom: 2px;
+      border-bottom: 1px solid var(--border); gap: 12px;
+    }
+    .sec-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--text-muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sec-label::before {
+      content: ''; display: inline-block;
+      width: 3px; height: 13px;
+      background: var(--cyan); border-radius: 2px;
+    }
+    .cover-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--amber); background: var(--amber-bg);
+      border: 1px solid rgba(245,158,11,0.2); padding: 5px 11px;
+      border-radius: 6px; text-decoration: none; font-weight: 600;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .cover-btn:hover { background: rgba(245,158,11,0.18); }
+    [data-theme="light"] .cover-btn {
+      color: var(--amber); background: var(--amber-bg);
+      border-color: rgba(149,95,59,0.25);
+    }
+    [data-theme="light"] .cover-btn:hover { background: rgba(149,95,59,0.15); }
+
+    .post-list { display: flex; flex-direction: column; }
+
+    .post-row {
+      display: flex; align-items: flex-start; gap: 22px;
+      padding: 18px 10px; border-bottom: 1px solid var(--border);
+      text-decoration: none; color: inherit;
+      border-radius: 8px; margin: 0 -10px;
+      transition: background 0.2s, transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+      position: relative;
+    }
+    .post-row:last-child { border-bottom: none; }
+    .post-row:hover { background: rgba(128,128,128,0.05); }
+    [data-theme="dark"] .post-row:hover { background: rgba(0,210,255,0.03); }
+    [data-theme="light"] .post-row {
+      border-radius: 12px; margin: 0 -12px; padding: 16px 12px;
+    }
+    [data-theme="light"] .post-row:hover {
+      background: color-mix(in srgb, var(--surface2) 60%, white 40%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgb(54 40 23 / 0.07);
+      border-color: color-mix(in srgb, var(--cyan) 25%, var(--border) 75%);
+    }
+
+    .post-meta {
+      flex-shrink: 0; width: 82px;
+      display: flex; flex-direction: column; align-items: flex-end;
+      gap: 5px; padding-top: 2px;
+    }
+    .pnum {
+      font-size: 10px; font-weight: 600; font-family: monospace;
+      color: var(--cyan); background: var(--cyan-bg);
+      border: 1px solid rgba(0,210,255,0.15);
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .pnum.b { color: #60a5fa; background: rgba(96,165,250,0.1); border-color: rgba(96,165,250,0.2); }
+    .pnum.v { color: #a78bfa; background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.2); }
+    .pnum.a { color: var(--amber); background: var(--amber-bg); border-color: rgba(245,158,11,0.2); }
+    .pnum.p { color: #c084fc; background: rgba(192,132,252,0.1); border-color: rgba(192,132,252,0.2); }
+    .pnum.t { color: #34d399; background: rgba(52,211,153,0.1); border-color: rgba(52,211,153,0.2); }
+    [data-theme="light"] .pnum { color: #955f3b; background: rgba(149,95,59,0.08); border-color: rgba(149,95,59,0.2); }
+    [data-theme="light"] .pnum.b { color: #2563eb; background: rgba(37,99,235,0.07); border-color: rgba(37,99,235,0.2); }
+    [data-theme="light"] .pnum.v { color: #7c3aed; background: rgba(124,58,237,0.07); border-color: rgba(124,58,237,0.2); }
+    [data-theme="light"] .pnum.a { color: #955f3b; background: rgba(149,95,59,0.08); border-color: rgba(149,95,59,0.2); }
+    [data-theme="light"] .pnum.p { color: #7c3aed; background: rgba(124,58,237,0.07); border-color: rgba(124,58,237,0.2); }
+    [data-theme="light"] .pnum.t { color: #3a7d44; background: rgba(58,125,68,0.08); border-color: rgba(58,125,68,0.2); }
+
+    .pdate { font-size: 10px; color: var(--text-faint); font-family: monospace; }
+    .pstatus {
+      font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 600;
+    }
+    .pstatus.live { color: var(--green); background: var(--green-bg); border: 1px solid rgba(74,222,128,0.2); }
+    [data-theme="light"] .pstatus.live { border-color: rgba(22,163,74,0.2); }
+
+    .post-body { flex: 1; min-width: 0; }
+    .ptitle {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      line-height: 1.5; margin-bottom: 5px;
+      transition: color 0.15s;
+    }
+    .post-row:hover .ptitle { color: var(--cyan); }
+    [data-theme="light"] .ptitle { font-family: Georgia, "Times New Roman", serif; font-size: 17px; }
+    .pexcerpt { font-size: 13px; color: var(--text-muted); line-height: 1.7; margin-bottom: 8px; }
+    .ptags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pt {
+      font-size: 10px; color: var(--text-muted);
+      background: rgba(128,128,128,0.06); border: 1px solid var(--border);
+      padding: 2px 7px; border-radius: 4px; transition: all 0.15s;
+    }
+    .pt.hl { color: var(--amber); background: var(--amber-bg); border-color: rgba(245,158,11,0.2); }
+    [data-theme="light"] .pt.hl { border-color: rgba(149,95,59,0.25); }
+    .post-row:hover .pt { border-color: var(--cyan-bg); }
+
+    .parrow {
+      flex-shrink: 0; align-self: center;
+      font-size: 15px; color: var(--text-faint);
+      transition: all 0.2s;
+    }
+    .post-row:hover .parrow { color: var(--cyan); transform: translateX(3px); }
+
+    .blog-footer {
+      margin-top: 56px; padding-top: 24px;
+      border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--text-faint);
+      display: flex; justify-content: space-between;
+      align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .blog-footer a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
+    .blog-footer a:hover { color: var(--cyan); }
+
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-100%); width: var(--sw) !important; }
+      .sidebar.mob-open { transform: translateX(0); }
+      .sb-toggle { left: 16px !important; }
+      .main { margin-left: 0 !important; padding: 0; }
+      .main-wrap { padding: 52px 20px 60px; }
+    }
+    @media (max-width: 560px) {
+      .page-title { font-size: 22px; }
+      .post-meta { width: 58px; }
+      .pnum { font-size: 9px; }
+      .ptitle { font-size: 14px; }
+      .parrow { display: none; }
+      .sec-head { flex-direction: column; align-items: flex-start; }
+      .topbar { margin-bottom: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sb-overlay" id="overlay" onclick="closeMobileSidebar()"></div>
+  <button class="sb-toggle" id="sbToggle" onclick="toggleSidebar()">‹</button>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-icon">✦</div>
+      <div class="sb-text">
+        <div class="sb-en">ONE-PAGE TECH</div>
+        <div class="sb-zh">一页图讲清楚系列</div>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="sb-nav-label">分类导航</div>
+      <button class="sb-item active" onclick="navTo('ctx',this)">
+        <span class="sb-ico">📚</span>
+        <span class="sb-label">上下文工程</span>
+        <span class="sb-count">9</span>
+      </button>
+      <button class="sb-item" onclick="navTo('se',this)">
+        <span class="sb-ico">🧩</span>
+        <span class="sb-label">软件工程新范式</span>
+        <span class="sb-count">5</span>
+      </button>
+      <button class="sb-item" onclick="navTo('adp',this)">
+        <span class="sb-ico">🤖</span>
+        <span class="sb-label">Agent 设计模式</span>
+        <span class="sb-count">2</span>
+      </button>
+      <button class="sb-item" onclick="navTo('share',this)">
+        <span class="sb-ico">🎤</span>
+        <span class="sb-label">技术分享</span>
+        <span class="sb-count">2</span>
+      </button>
+    </nav>
+
+    <div class="sb-bottom">
+      <button class="sb-item" id="themeBtn" onclick="toggleTheme()">
+        <span class="sb-ico" id="themeIco">☀️</span>
+        <span class="sb-label" id="themeTxt">切换亮色</span>
+      </button>
+      <a href="https://github.com/hanhx/hhx-tech-pub" target="_blank" class="sb-item">
+        <span class="sb-ico">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </span>
+        <span class="sb-label">GitHub</span>
+      </a>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+  <div class="main-wrap">
+
+    <div class="topbar">
+      <button class="tb-btn" onclick="toggleTheme()"><span id="topThemeIco">☀️</span></button>
+      <a href="https://github.com/hanhx/hhx-tech-pub" target="_blank" class="tb-btn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+
+    <div class="page-hd">
+      <div class="page-eyebrow">Technical Blog</div>
+      <div class="page-title">AI 硬核技术图解</div>
+      <div class="page-desc">用一页图讲清楚复杂 AI 系统的底层机制，涵盖上下文工程、Agent 架构、软件工程新范式。</div>
+    </div>
+
+
+    <!-- ── 上下文工程 ── -->
+    <section class="section" id="ctx">
+      <div class="sec-head">
+        <div class="sec-label">上下文工程</div>
+        <a href="context-engineering/group-cover-1080.html" class="cover-btn" target="_blank">📸 本组封面</a>
+      </div>
+      <div class="post-list">
+
+        <a href="context-engineering/01-context-engine/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 01 期</div><div class="pdate">03-15</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">ContextEngine 到底开放了什么？</div>
+            <div class="pexcerpt">OpenClaw 史诗级架构升级：从硬编码到可插拔的记忆底座</div>
+            <div class="ptags"><span class="pt">架构设计</span><span class="pt">插件系统</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/02-lossless-claw/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 02 期</div><div class="pdate">03-15</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">lossless-claw 凭什么敢叫无损记忆？</div>
+            <div class="pexcerpt">接管 7 大生命周期钩子，用状态机实现真正的 0 损失记忆管理</div>
+            <div class="ptags"><span class="pt">状态机</span><span class="pt">DIA 理论</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/03-windsurf-context-mem/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 03 期</div><div class="pdate">03-17</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">Windsurf 是如何做到「既记得住，又不乱看」的？</div>
+            <div class="pexcerpt">记忆模块 + RAG 上下文引擎：让模型每一步只看到最有用的那 1%</div>
+            <div class="ptags"><span class="pt">Memory</span><span class="pt">RAG</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/04-openviking/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 04 期</div><div class="pdate">03-18</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">lossless-claw × OpenViking = 完整的 AI 大脑</div>
+            <div class="pexcerpt">会话内无损记忆 + 跨会话长期记忆，两个插槽一行配置，AI 首次拥有连续记忆</div>
+            <div class="ptags"><span class="pt">长期记忆</span><span class="pt">插槽协作</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/05-claude-code/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 05 期</div><div class="pdate">03-21</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">Claude Code 凭什么不靠预建索引，也能精准改代码？</div>
+            <div class="pexcerpt">无索引架构的秘密：子智能体搜索 + 多层过滤，每次只看最相关的代码</div>
+            <div class="ptags"><span class="pt">Claude Code</span><span class="pt">无索引架构</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/06-claude-skills/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 06 期</div><div class="pdate">03-21</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">一张图讲透 Claude Code 的 Skills 渐进披露黑科技</div>
+            <div class="pexcerpt">Memory Files 渐进披露 → Skills YAML 标准化，Main Agent 调度 0 改动，披露机制产品化升级</div>
+            <div class="ptags"><span class="pt">Skills</span><span class="pt">渐进披露</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/07-memory-architecture/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 07 期</div><div class="pdate">03-23</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">AI Agent 完整记忆架构设计：从会话无损到跨会话联想</div>
+            <div class="pexcerpt">借 ContextEngine 与 OpenViking，实现全量存 + 摘要发，打通会话内短期无损上下文与全局长期记忆</div>
+            <div class="ptags"><span class="pt">记忆架构</span><span class="pt">4 层抽象</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/08-claude-code-memory-design/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 08 期</div><div class="pdate">03-25</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">只存不可派生的认知</div>
+            <div class="pexcerpt">Claude Code 记忆设计：三层机制保证存得准、取得准、不过期</div>
+            <div class="ptags"><span class="pt">记忆设计</span><span class="pt">源码解读</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="context-engineering/09-claude-code-autodream/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum">第 09 期</div><div class="pdate">03-27</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">记忆会腐化</div>
+            <div class="pexcerpt">autoDream 是记忆的 GC：让 Claude Code 的知识长期可信赖</div>
+            <div class="ptags"><span class="pt">autoDream</span><span class="pt">记忆 GC</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── 软件工程新范式 ── -->
+    <section class="section" id="se">
+      <div class="sec-head">
+        <div class="sec-label">软件工程新范式</div>
+        <a href="software-engineering/group-cover-1080.html" class="cover-btn" target="_blank">📸 本组封面</a>
+      </div>
+      <div class="post-list">
+
+        <a href="software-engineering/01-sdd-try/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum b">SE-01</div><div class="pdate">03-24</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">SDD 实战入门：团队经验分享</div>
+            <div class="pexcerpt">标准理论 + 团队实战经验：提效 30%，编码与自测自动化 80%</div>
+            <div class="ptags"><span class="pt">SDD</span><span class="pt">Spec</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="software-engineering/02-harness-engineering/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum b">SE-02</div><div class="pdate">03-27</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">Harness Engineering 深度拆解</div>
+            <div class="pexcerpt">OpenAI 内部激进实验：人类 0 行手写，AI 自治交付 100 万行代码</div>
+            <div class="ptags"><span class="pt">Harness</span><span class="pt">Agent</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="software-engineering/03-harness-design-long-running-apps/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum v">SE-03</div><div class="pdate">03-29</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">Anthropic Harness 设计拆解</div>
+            <div class="pexcerpt">从单体 Agent 失控到三层 Harness：把长任务开发变成可验证交付</div>
+            <div class="ptags"><span class="pt">Anthropic</span><span class="pt">Harness</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="software-engineering/04-effective-harnesses-for-long-running-agents/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum a">SE-04</div><div class="pdate">03-31</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">长任务 Agent 稳定交付的底层机制</div>
+            <div class="pexcerpt">决定 Agent 上限的不是模型，是 Harness：交接资产、增量纪律、端到端验收三层机制全拆解</div>
+            <div class="ptags"><span class="pt">Anthropic</span><span class="pt">长任务</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="software-engineering/05-claude-code-inner-is-harness/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum v">SE-05</div><div class="pdate">04-01</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">Claude Code 里面，就是一套 Harness</div>
+            <div class="pexcerpt">源码意外流出，打开一看全是 Harness：外面工程师搭 Harness，里面还是 Harness</div>
+            <div class="ptags"><span class="pt">Claude Code</span><span class="pt">Harness</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Agent 设计模式 ── -->
+    <section class="section" id="adp">
+      <div class="sec-head">
+        <div class="sec-label">Agent 设计模式</div>
+        <a href="agent-design-patterns/group-cover-1080.html" class="cover-btn" target="_blank">📸 本组封面</a>
+      </div>
+      <div class="post-list">
+
+        <a href="agent-design-patterns/01-ReAct/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum t">ADP-01</div><div class="pdate">04-03</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">ReAct：推理与行动的协同</div>
+            <div class="pexcerpt">从 2022 年普林斯顿论文到 Claude Code 的 queryLoop——翻源码才真正看懂 ReAct</div>
+            <div class="ptags"><span class="pt">ReAct</span><span class="pt">Claude Code</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="agent-design-patterns/02-Plan-And-Execute/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum t">ADP-02</div><div class="pdate">04-05</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">Plan-and-Execute：先规划，再执行</div>
+            <div class="pexcerpt">ReAct 跑不了长任务，Plan-and-Execute 怎么解的——LangChain 架构分离 vs Claude Code 状态切换，两种落地对比</div>
+            <div class="ptags"><span class="pt">Plan-and-Execute</span><span class="pt">Claude Code</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── 技术分享 ── -->
+    <section class="section" id="share">
+      <div class="sec-head">
+        <div class="sec-label">技术分享</div>
+        
+      </div>
+      <div class="post-list">
+
+        <a href="share/openclaw-ctx-mem/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum p">整合</div><div class="pdate">03-23</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">开源记忆架构完整解析</div>
+            <div class="pexcerpt">整合 01、02、04、07 期内容，4 页讲透 ContextEngine、lossless-claw、OpenViking 和完整架构</div>
+            <div class="ptags"><span class="pt">记忆架构</span><span class="pt">ContextEngine</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+
+        <a href="share/sdd/index.html" class="post-row">
+          <div class="post-meta"><div class="pnum a">分享</div><div class="pdate">03-23</div><div class="pstatus live">已发布</div></div>
+          <div class="post-body">
+            <div class="ptitle">SDD 实战入门：团队经验分享</div>
+            <div class="pexcerpt">标准理论 + 团队实战经验，开发成本降低 30%，自测自动化 80%</div>
+            <div class="ptags"><span class="pt">SDD</span><span class="pt">规格驱动开发</span></div>
+          </div>
+          <div class="parrow">→</div>
+        </a>
+      </div>
+    </section>
+
+    <div class="blog-footer">
+      <span>© 2025 ONE PAGE TECH · 一页图讲清楚</span>
+      <div style="display:flex;gap:16px;">
+        <a href="https://github.com/hanhx/hhx-tech-pub" target="_blank">GitHub</a>
+      </div>
+    </div>
+
+  </div>
+  </main>
+
+  <script>
+    const sb = document.getElementById('sidebar');
+    const main = document.getElementById('main');
+    const toggle = document.getElementById('sbToggle');
+    const overlay = document.getElementById('overlay');
+    let collapsed = false;
+
+    function toggleSidebar() {
+      if (window.innerWidth <= 900) {
+        sb.classList.toggle('mob-open');
+        overlay.classList.toggle('show');
+      } else {
+        collapsed = !collapsed;
+        sb.classList.toggle('collapsed', collapsed);
+        main.classList.toggle('wide', collapsed);
+        toggle.classList.toggle('is-col', collapsed);
+        toggle.textContent = collapsed ? '›' : '‹';
+      }
+    }
+    function closeMobileSidebar() {
+      sb.classList.remove('mob-open');
+      overlay.classList.remove('show');
+    }
+
+    function navTo(id, btn) {
+      document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById(id);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    const html = document.documentElement;
+    const themeIco = document.getElementById('themeIco');
+    const topThemeIco = document.getElementById('topThemeIco');
+    const themeTxt = document.getElementById('themeTxt');
+
+    function applyTheme(t) {
+      html.setAttribute('data-theme', t);
+      const isDark = t === 'dark';
+      themeIco.textContent = isDark ? '☀️' : '🌙';
+      topThemeIco.textContent = isDark ? '☀️' : '🌙';
+      themeTxt.textContent = isDark ? '切换亮色' : '切换暗色';
+      localStorage.setItem('theme', t);
+    }
+
+    function toggleTheme() {
+      applyTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    }
+
+    (function() {
+      const saved = localStorage.getItem('theme');
+      if (saved) applyTheme(saved);
+    })();
+  </script>
+</body>
+</html>

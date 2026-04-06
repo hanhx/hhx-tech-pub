@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一页图讲清楚：lossless-claw × OpenViking —— AI 的完整连续记忆</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(52,152,219,0.10), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(155,89,182,0.08), transparent 28%),
+        linear-gradient(135deg, #f6f8fb, #eef3f9);
+      color: #1f2d3d;
+      height: 100vh;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+
+    .slide {
+      width: 96vw;
+      max-width: 1400px;
+      height: 92vh;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(120,140,160,0.18);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(31,45,61,0.12);
+      padding: 24px 28px 18px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 14px;
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      border-bottom: 1px solid #e8eef5;
+      padding-bottom: 12px;
+    }
+    .title-wrap h1 {
+      font-size: 30px;
+      line-height: 1.2;
+      color: #102235;
+      margin-bottom: 6px;
+      letter-spacing: 0.2px;
+    }
+    .title-wrap h1 .blue { color: #1d4ed8; }
+    .title-wrap h1 .purple { color: #6d28d9; }
+    .title-wrap p {
+      font-size: 15px;
+      color: #5d6b7a;
+      line-height: 1.5;
+    }
+    .title-wrap p strong { color: #374151; }
+    .tag {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #0f62fe, #4b8dff);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.18);
+    }
+
+    .summary {
+      background: linear-gradient(135deg, #103a5c, #155b8b);
+      color: #fff;
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .summary .label {
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.9;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .summary .text {
+      font-size: 20px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+    .summary .text em { font-style: normal; color: #fef08a; }
+
+    .main {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+      align-items: start;
+      align-content: start;
+    }
+    .main::before {
+      content: '';
+      position: absolute;
+      top: 18px;
+      left: 40px;
+      right: 40px;
+      height: 3px;
+      background: linear-gradient(to right,
+        #3b82f6 0%, #3b82f6 25%,
+        #2563eb 25%, #2563eb 50%,
+        #7c3aed 50%, #7c3aed 75%,
+        #f59e0b 75%, #f59e0b 100%
+      );
+      z-index: 1;
+    }
+    .t-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 0;
+    }
+    .t-dot {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 800; color: #fff;
+      z-index: 2; flex-shrink: 0; margin-bottom: 8px;
+    }
+    .t-dot.c1 { background: #3b82f6; }
+    .t-dot.c2 { background: #2563eb; }
+    .t-dot.c3 { background: #7c3aed; }
+    .t-dot.c4 { background: #f59e0b; }
+    .t-dot.c1::after, .t-dot.c2::after, .t-dot.c3::after {
+      content: '>';
+      position: absolute;
+      right: -22px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1;
+      z-index: 3;
+    }
+    .t-dot { position: relative; }
+    .t-dot.c1::after { color: #3b82f6; }
+    .t-dot.c2::after { color: #2563eb; }
+    .t-dot.c3::after { color: #7c3aed; }
+
+    .t-card {
+      width: 100%;
+      border-radius: 14px;
+      padding: 10px 12px 8px;
+      display: flex; flex-direction: column;
+      min-height: 0;
+    }
+    .t-card.c1 { background: #eff6ff; border: 1.5px solid #bfdbfe; }
+    .t-card.c2 { background: #eef2ff; border: 1.5px solid #c7d2fe; }
+    .t-card.c3 { background: #f5f3ff; border: 1.5px solid #ddd6fe; }
+    .t-card.c4 { background: #fffbeb; border: 1.5px solid #fde68a; }
+
+    .t-phase {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
+    }
+    .c1 .t-phase { color: #3b82f6; }
+    .c2 .t-phase { color: #4f46e5; }
+    .c3 .t-phase { color: #7c3aed; }
+    .c4 .t-phase { color: #d97706; }
+
+    .t-title {
+      font-size: 14px; font-weight: 700; color: #111827;
+      margin-bottom: 6px; line-height: 1.3;
+    }
+    .mini-flow { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .mf-node {
+      border-radius: 5px; padding: 4px 8px;
+      font-size: 11px; line-height: 1.3;
+    }
+    .mf-node strong { display: block; font-size: 11px; margin-bottom: 1px; }
+    .mf-node span { font-size: 10px; color: #6b7280; }
+    .mf-node.bn { background: #dbeafe; color: #1e40af; }
+    .mf-node.in { background: #e0e7ff; color: #3730a3; }
+    .mf-node.pn { background: #ede9fe; color: #5b21b6; }
+    .mf-node.gn { background: #dcfce7; color: #166534; }
+    .mf-node.an { background: #fef3c7; color: #92400e; }
+    .mf-node.gy { background: #f3f4f6; color: #374151; }
+    .mf-arrow { text-align: center; font-size: 8px; color: #d1d5db; line-height: 1; }
+
+    .t-badge {
+      display: inline-flex; align-items: center;
+      margin-top: 4px; padding: 2px 8px;
+      border-radius: 999px; font-size: 9px; font-weight: 700;
+      align-self: flex-start;
+    }
+    .t-badge.bb { background: #1d4ed8; color: #fff; }
+    .t-badge.ib { background: #4338ca; color: #fff; }
+    .t-badge.pb { background: #6d28d9; color: #fff; }
+    .t-badge.ab { background: #d97706; color: #fff; }
+
+    .loop-arrow {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: center;
+    }
+    .loop-arrow svg {
+      width: 100%;
+      height: 32px;
+    }
+    .bottom-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mem-bar {
+      background: linear-gradient(to right, #f8fafc, #f1f5f9);
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #64748b;
+      border-radius: 14px;
+      padding: 8px 12px;
+      display: flex; flex-direction: column;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .mem-title {
+      font-size: 15px; font-weight: 700;
+      color: #b45309; margin-bottom: 6px;
+    }
+    .mem-track {
+      display: flex; height: 18px;
+      border-radius: 5px; overflow: hidden; margin-bottom: 4px;
+    }
+    .ms {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #fff;
+    }
+    .ms.s1 { background: #3b82f6; flex: 1; }
+    .ms.s2 { background: #7c3aed; flex: 1.6; }
+    .ms.s3 { background: #16a34a; flex: 2.2; }
+    .ms.s4 { background: #f59e0b; flex: 3; }
+    .mem-subs {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr 2.2fr 3fr;
+      font-size: 10px; color: #94a3b8; text-align: center;
+    }
+
+    .takeaway {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #edf2f7;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.05);
+      padding: 8px 12px;
+    }
+    .takeaway h3 {
+      font-size: 15px; margin-bottom: 6px;
+      color: #12263a; font-weight: 700;
+    }
+    .takeaway .quote {
+      font-size: 14px; line-height: 1.4;
+      font-weight: 700; color: #0f172a; margin-bottom: 6px;
+      text-align: center;
+    }
+    .takeaway .quote em { font-style: normal; color: #1d4ed8; }
+    .takeaway .note {
+      font-size: 12px; color: #5b6b7c; line-height: 1.4;
+      text-align: right;
+    }
+
+    .export-btn {
+      position: fixed; bottom: 30px; right: 30px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #0f62fe, #4b8dff);
+      color: #fff; border: none; border-radius: 999px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.3);
+      transition: all 0.3s ease; z-index: 1000;
+    }
+    .export-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(15,98,254,0.4);
+    }
+    .export-btn:active { transform: translateY(0); }
+
+    .home-btn {
+      position: fixed; top: 20px; left: 20px;
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,0.95);
+      color: #0f62fe; border: 2px solid #0f62fe;
+      border-radius: 50%; font-size: 16px; font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15,98,254,0.15);
+      transition: all 0.3s ease; z-index: 1000;
+      text-decoration: none;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+    }
+    .home-btn:hover {
+      background: #0f62fe; color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(15,98,254,0.25);
+    }
+    .home-btn:active { transform: translateY(0); }
+
+    @media (max-width: 1100px) {
+      .slide { height: auto; min-height: 92vh; overflow: auto; }
+      .main { grid-template-columns: 1fr 1fr; }
+      .bottom-section { grid-template-columns: 1fr; }
+
+    }
+
+  </style>
+</head>
+<body>
+
+  <a href="../../index.html" class="home-btn">←</a>
+
+  <div class="slide">
+
+        <!-- Header -->
+        <div class="header">
+          <div class="title-wrap">
+            <h1>一页图讲清楚：<span class="blue">lossless-claw</span> × <span class="purple">OpenViking</span> = AI 终极记忆解决方案</h1>
+            <p><strong>问题</strong>：AI 每次对话都是陌生人 · <strong>方案</strong>：lossless-claw 管好「这一次」，OpenViking 记住「每一次」，两个插槽<strong>一行配置、自动闭环</strong></p>
+    <!-- Summary -->
+    <div class="summary">
+      <div class="label">顶层结论</div>
+      <div class="text">
+        会话内：<em>lossless-claw</em>（contextEngine 插槽）全量保留对话、自动压缩、无损召回 · 跨会话：<em>OpenViking</em>（memory 插槽）自迭代提炼长期记忆、分层存储、精准注入 · 结果：AI 首次拥有<em>连续记忆</em>
+      </div>
+    </div>
+
+    <!-- Main: 4-column Timeline -->
+    <div class="main">
+
+      <div class="t-node">
+        <div class="t-dot c1">1</div>
+        <div class="t-card c1">
+          <div class="t-phase">会话开始</div>
+          <div class="t-title">OpenViking 先召回，AI 一开口就认识你</div>
+          <div class="mini-flow">
+            <div class="mf-node pn"><strong>📡 召回长期记忆</strong><span>按相关度检索 viking://user/* 和 agent/*</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node pn"><strong>🔍 匹配当前意图</strong><span>根据首句话筛选最相关的记忆片段</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node bn"><strong>💉 注入初始上下文</strong><span>偏好 · 项目背景 · 历史决策全部到位</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node bn"><strong>🔄 lossless-claw 接管</strong><span>7 个生命周期钩子全部就绪</span></div>
+          </div>
+          <span class="t-badge bb">🧠 每次会话都如此</span>
+        </div>
+      </div>
+
+      <div class="t-node">
+        <div class="t-dot c2">2</div>
+        <div class="t-card c2">
+          <div class="t-phase">对话进行中</div>
+          <div class="t-title">lossless-claw 全程护航上下文</div>
+          <div class="mini-flow">
+            <div class="mf-node bn"><strong>📥 ingest 钩子</strong><span>每句话全量拦截，原文落 SQLite，绝不丢失</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node bn"><strong>📦 assemble 钩子</strong><span>组装「顶层摘要 + 原文锚点」发给模型</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node an"><strong>⚡ compact（Token 快满时触发）</strong><span>线性对话盘成 DAG，高 DIA 摘要保留因果锚点</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node gy"><strong>🤖 Frontier 模型决策</strong><span>Claude / GPT 在高密上下文里规划执行</span></div>
+          </div>
+          <span class="t-badge ib">📊 OOLONG 74.8 vs Claude Code 70.3（据官方 benchmark）</span>
+        </div>
+      </div>
+
+      <div class="t-node">
+        <div class="t-dot c3">3</div>
+        <div class="t-card c3">
+          <div class="t-phase">会话结束</div>
+          <div class="t-title">OpenViking 会话后自动提炼长期记忆</div>
+          <div class="mini-flow">
+            <div class="mf-node bn"><strong>🔁 会话结束后调用</strong><span>extract_memory 可自动触发，与 lossless-claw 松耦合</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node pn"><strong>⚙️ 自迭代流程</strong><span>抽取「值得长期记住的信息」，过滤噪声</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node pn"><strong>� 分命名空间写入</strong><span>viking://user/*（偏好·决策）+ viking://agent/*（专属经验）</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node pn"><strong>🗂️ L0/L1/L2 分层压缩</strong><span>热数据秒级召回，冷数据归档，「省 95% Token」（据官方数据）</span></div>
+          </div>
+          <span class="t-badge pb">� 全自动，无需手动标注</span>
+        </div>
+      </div>
+
+      <div class="t-node">
+        <div class="t-dot c4" style="font-size:11px;">N+1</div>
+        <div class="t-card c4">
+          <div class="t-phase">下一次会话 · 持续积累</div>
+          <div class="t-title">记忆越用越多，AI 越来越懂你</div>
+          <div class="mini-flow">
+            <div class="mf-node an"><strong>📈 增量索引更新</strong><span>新记忆写入向量库，旧记忆权重衰减</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node an"><strong>🎯 检索精度自提升</strong><span>目录层级优先 + 递归精炼，积累越多越准</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node gn"><strong>🔗 跨 Agent 知识复用</strong><span>A Agent 的经验可被 B Agent 引用（需授权）</span></div>
+            <div class="mf-arrow">↓</div>
+            <div class="mf-node bn"><strong>🔁 回到步骤1，循环往复</strong><span>每次开始，OpenViking 先召回，lossless-claw 再接管</span></div>
+          </div>
+          <span class="t-badge ab">♾️ 无限循环，越用越强</span>
+        </div>
+      </div>
+
+      <!-- Loop arrow -->
+      <div class="loop-arrow">
+      <svg viewBox="0 0 800 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+          </marker>
+          <linearGradient id="loopGrad" x1="700" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="50%" stop-color="#7c3aed"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
+          </linearGradient>
+        </defs>
+        <path d="M 700 2 Q 780 2, 780 16 Q 780 30, 700 30 L 100 30 Q 20 30, 20 16 Q 20 2, 100 2" 
+              stroke="url(#loopGrad)" stroke-width="1.5" stroke-dasharray="6 3" 
+              marker-end="url(#arrowhead)" fill="none"/>
+        <text x="400" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#94a3b8">循环</text>
+      </svg>
+      </div>
+    </div>
+
+    <!-- Bottom: Mem-bar + Takeaway -->
+    <div class="bottom-section">
+      <div class="mem-bar">
+        <div class="mem-title">📊 记忆积累示意 —— 每经历一次会话，长期记忆库就增长一次</div>
+        <div class="mem-track">
+          <div class="ms s1">第1次</div>
+          <div class="ms s2">第2次</div>
+          <div class="ms s3">第3次</div>
+          <div class="ms s4">第N次 · 越来越懂你 →</div>
+        </div>
+        <div class="mem-subs">
+          <span>📭 AI 不认识你</span>
+          <span>📬 知道你的偏好</span>
+          <span>📚 了解你的项目</span>
+          <span>🤝 形成深度协作</span>
+        </div>
+      </div>
+
+      <div class="takeaway">
+        <h3>🎯 一句话带走</h3>
+        <div class="quote">
+          <em>lossless-claw</em> 让 AI 这一场对话绝不断片，<em>OpenViking</em> 让 AI 下一场对话还认识你。
+          两个加在一起——AI 才第一次拥有真正的<em>连续记忆</em>。
+        </div>
+        <div class="note">
+         OpenClaw 终极记忆配置：{"plugins": {"slots": {"contextEngine": "lossless-claw", "memory": "memory-openviking"}}}
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <button class="export-btn" onclick="exportAsImage()">📸 导出为图片</button>
+
+  <script>
+    async function exportAsImage() {
+      const button = document.querySelector('.export-btn');
+      button.textContent = '生成中...';
+      button.disabled = true;
+
+      try {
+        const slideElement = document.querySelector('.slide');
+        const canvas = await html2canvas(slideElement, {
+          scale: 2,
+          backgroundColor: null,
+          logging: false,
+          useCORS: true
+        });
+
+        const link = document.createElement('a');
+        link.download = '一页图04-lossless-claw-OpenViking.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        button.textContent = '✅ 导出成功';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      } catch (error) {
+        console.error('导出失败:', error);
+        button.textContent = '❌ 导出失败';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      }
+    }
+  </script>
+</body>
+</html>

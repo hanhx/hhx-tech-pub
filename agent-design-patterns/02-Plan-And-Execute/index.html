@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Plan-and-Execute：从模式到落地</title>
+<meta name="description" content="结合 LangChain、Anthropic 架构指南与 Claude Code 泄露源码，解析 Plan-and-Execute 的两种工程实现。"/>
+<meta name="theme-color" content="#1a1a2e"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#0f172a;--bg2:#1e293b;--bg3:#334155;
+  --accent:#38bdf8;--accent2:#818cf8;--green:#34d399;--orange:#fbbf24;--red:#fb7185;
+  --purple:#c084fc;
+  --text:#f8fafc;--text-dim:#94a3b8;--code-bg:#0d1117;
+  --card-bg:rgba(255,255,255,0.03);--card-border:rgba(255,255,255,0.08);
+  --transition:0.4s cubic-bezier(.25,.8,.25,1)
+}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:var(--accent) var(--bg1)}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg1) 100%);color:var(--text);line-height:1.8;overflow-x:hidden;letter-spacing:0.02em;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body::before{content:'';position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:linear-gradient(rgba(129,140,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(129,140,248,0.03) 1px,transparent 1px);background-size:40px 40px;z-index:-2;pointer-events:none}
+body::after{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%, rgba(192,132,252,0.07), transparent 30%), radial-gradient(circle at 80% 20%, rgba(129,140,248,0.06), transparent 25%);z-index:-1;pointer-events:none;animation:bgPulse 20s ease-in-out infinite alternate}
+@keyframes bgPulse {
+  0% { transform: scale(1) rotate(0deg); opacity: 0.5; }
+  100% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--accent2);border-radius:3px}
+
+#progress{position:fixed;top:0;right:0;width:4px;height:0;background:linear-gradient(180deg,var(--accent2),var(--purple));z-index:1000;transition:height .25s;border-radius:0 0 0 4px}
+
+#nav{position:fixed;top:0;left:0;width:260px;height:100vh;background:rgba(15,23,42,.94);backdrop-filter:blur(14px);border-right:1px solid var(--card-border);z-index:900;transform:translateX(-100%);transition:transform var(--transition);overflow-y:auto;padding:56px 0 20px;scrollbar-width:thin;scrollbar-color:var(--accent2) transparent}
+#nav.open{transform:translateX(0)}
+#nav a{display:block;padding:7px 18px;color:var(--text-dim);font-size:13px;text-decoration:none;border-left:3px solid transparent;transition:all .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#nav a:hover,#nav a.active{color:var(--accent2);border-left-color:var(--accent2);background:rgba(129,140,248,.06)}
+#nav a .num{display:inline-block;width:22px;color:var(--purple);font-weight:700;font-size:11px}
+#menu-btn{position:fixed;top:14px;left:14px;z-index:950;width:40px;height:40px;border:none;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text);font-size:20px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+#menu-btn:hover{background:var(--accent2)}
+
+.s{min-height:100vh;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;padding:80px 6vw;position:relative}
+.s .inner{max-width:1600px;width:100%;opacity:0;transform:translateY(40px);transition:opacity .7s,transform .7s}
+.s.visible .inner{opacity:1;transform:translateY(0)}
+
+.s h1{font-size:clamp(64px,8vw,96px);font-weight:900;line-height:1.2;margin-bottom:32px;background:linear-gradient(135deg,#fff 20%,var(--accent2) 70%,var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.02em;filter:drop-shadow(0 0 20px rgba(129,140,248,0.3));animation:titleShine 4s linear infinite}
+@keyframes titleShine {
+  0%, 100% { filter: drop-shadow(0 0 15px rgba(129,140,248,0.2)); }
+  50% { filter: drop-shadow(0 0 30px rgba(129,140,248,0.5)); }
+}
+.s h2{font-size:clamp(44px,6vw,64px);font-weight:700;margin-bottom:32px;color:#fff;letter-spacing:-0.01em}
+.s h3{font-size:clamp(32px,4vw,48px);font-weight:600;margin-bottom:24px;color:var(--accent2)}
+.s p,.s li{color:var(--text-dim);margin-bottom:16px;line-height:1.7;font-size:clamp(20px,2vw,26px)}
+.sub{font-size:clamp(28px,3vw,40px);color:var(--text-dim);margin-bottom:40px}
+.divider{width:60px;height:3px;background:linear-gradient(90deg,var(--accent2),var(--purple));border-radius:2px;margin:16px 0}
+.tag{display:inline-block;padding:10px 24px;border-radius:8px;font-size:20px;font-weight:700;background:rgba(129,140,248,.1);color:var(--accent2);margin:8px;border:1px solid rgba(129,140,248,.3);text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 10px rgba(129,140,248,.2)}
+
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:32px;margin-top:32px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px;transition:all .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 16px rgba(0,0,0,0.2);position:relative;overflow:hidden;backdrop-filter:blur(10px)}
+.card::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);transform:skewX(-20deg);transition:0.5s}
+.card:hover{transform:translateY(-6px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.1), 0 12px 32px rgba(129,140,248,0.15);border-color:rgba(129,140,248,0.4)}
+.card:hover::after{left:150%}
+.card .icon{font-size:68px;margin-bottom:28px;filter:drop-shadow(0 0 8px rgba(255,255,255,0.2))}
+.card h4{font-size:34px;color:#fff;margin-bottom:16px}
+.card p{font-size:22px;color:var(--text-dim);line-height:1.6}
+
+.ba-compare{display:grid;grid-template-columns:1fr 80px 1fr;gap:28px;align-items:center;margin:40px 0}
+.ba-box{background:var(--card-bg);border:1px solid var(--card-border);border-radius:18px;padding:40px;height:100%}
+.ba-box.before{border-color:rgba(251,113,133,.3);background:linear-gradient(180deg, rgba(251,113,133,0.05) 0%, transparent 100%)}
+.ba-box.after{border-color:rgba(129,140,248,.3);background:linear-gradient(180deg, rgba(129,140,248,0.05) 0%, transparent 100%)}
+.ba-box h4{font-size:36px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-weight:700}
+.ba-box p{font-size:22px;color:var(--text-dim);margin-bottom:12px;line-height:1.6}
+.ba-arrow{text-align:center;font-size:56px;color:var(--accent2);filter:drop-shadow(0 0 12px var(--accent2))}
+
+.quote{border-left:5px solid var(--accent2);padding:28px 36px;background:rgba(129,140,248,.04);border-radius:0 14px 14px 0;font-size:26px;font-style:italic;color:var(--text);margin:32px 0;box-shadow:0 4px 12px rgba(0,0,0,.1);position:relative;overflow:hidden}
+.quote::after{content:'"';position:absolute;right:24px;bottom:-30px;font-size:120px;color:rgba(255,255,255,0.03);font-family:serif;line-height:1}
+
+.page-ctrl{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:800}
+.page-ctrl button{width:44px;height:44px;border:none;border-radius:12px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text);font-size:18px;cursor:pointer;transition:background .2s;border:1px solid rgba(255,255,255,0.1)}
+.page-ctrl button:hover{background:var(--accent2);color:#0f172a;border-color:var(--accent2)}
+#to-top{position:fixed;bottom:136px;right:24px;width:44px;height:44px;border:none;border-radius:12px;background:rgba(192,132,252,.8);color:#fff;font-size:18px;cursor:pointer;z-index:800;opacity:0;pointer-events:none;transition:opacity .3s;box-shadow:0 4px 12px rgba(192,132,252,0.3)}
+#to-top.show{opacity:1;pointer-events:auto}
+#page-num{position:fixed;bottom:24px;left:24px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text-dim);font-size:14px;padding:6px 14px;border-radius:20px;z-index:800;border:1px solid var(--card-border);font-family:"SF Mono","Fira Code",Consolas,monospace;letter-spacing:1px}
+
+/* 分层流程图 */
+.split-diagram{display:grid;grid-template-columns:1fr 60px 1fr;gap:20px;align-items:stretch;margin:40px 0}
+.split-box{border-radius:20px;padding:36px;text-align:center}
+.split-planner{background:linear-gradient(135deg,rgba(129,140,248,0.15),rgba(129,140,248,0.05));border:2px solid rgba(129,140,248,0.5);box-shadow:0 0 40px rgba(129,140,248,0.15)}
+.split-executor{background:linear-gradient(135deg,rgba(52,211,153,0.15),rgba(52,211,153,0.05));border:2px solid rgba(52,211,153,0.5);box-shadow:0 0 40px rgba(52,211,153,0.15)}
+.split-icon{font-size:52px;margin-bottom:12px}
+.split-box h4{font-size:28px;font-weight:800;margin-bottom:12px}
+.split-planner h4{color:var(--accent2)}
+.split-executor h4{color:var(--green)}
+.split-box .role{font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.6;margin-bottom:16px}
+.split-box p{font-size:17px;color:var(--text-dim);line-height:1.6;margin:0}
+.split-arrow{display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--orange);filter:drop-shadow(0 0 10px var(--orange))}
+
+.code-block{background:var(--code-bg);border:1px solid rgba(255,255,255,0.08);border-left:4px solid var(--accent2);border-radius:12px;padding:28px 32px;font-family:ui-monospace,"Fira Code","JetBrains Mono",Consolas,monospace;font-size:clamp(13px,1.2vw,17px);line-height:1.85;color:#e2e8f0;overflow-x:auto;margin:24px 0;box-shadow:0 4px 24px rgba(0,0,0,.4);position:relative}
+.code-block::before{content:attr(data-lang);position:absolute;top:10px;right:16px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);opacity:0.7}
+.code-kw{color:#c792ea}.code-fn{color:#82aaff}.code-str{color:#c3e88d}.code-cm{color:#546e7a;font-style:italic}.code-num{color:#f78c6c}.code-type{color:#ffcb6b}.code-op{color:#89ddff}
+
+@media(max-width:768px){
+  .s{padding:40px 16px}
+  #nav{width:220px}
+  .ba-compare{grid-template-columns:1fr;gap:12px}
+  .ba-arrow{transform:rotate(90deg);font-size:32px;margin:8px 0}
+  .card-grid{grid-template-columns:1fr}
+  .split-diagram{grid-template-columns:1fr;gap:12px}
+  .split-arrow{font-size:36px;transform:rotate(90deg)}
+}
+
+@media(max-height:600px) and (orientation:landscape){
+  .s{padding:20px 18vw 20px 12vw;min-height:100vh}
+  .s h1{font-size:clamp(28px,5vw,42px);margin-bottom:12px}
+  .s h2{font-size:clamp(24px,4vw,32px);margin-bottom:12px}
+  .sub{font-size:16px;margin-bottom:16px}
+  .card{padding:16px}
+  .card .icon{font-size:32px;margin-bottom:10px}
+  .card h4{font-size:18px;margin-bottom:8px}
+  .card p{font-size:14px;line-height:1.4;margin-bottom:0}
+  .quote{padding:16px 20px;font-size:16px;margin:16px 0}
+  .page-ctrl{right:16vw}
+  #to-top{right:16vw}
+  #page-num{left:10vw}
+  #menu-btn{left:10vw}
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<button id="menu-btn" aria-label="导航菜单">☰</button>
+
+<nav id="nav">
+  <a href="#s1"><span class="num">01</span> 封面</a>
+  <a href="#s2"><span class="num">02</span> ReAct 的局限</a>
+  <a href="#s3"><span class="num">03</span> LangChain：模式定义</a>
+  <a href="#s4"><span class="num">04</span> Claude Code：源码落地</a>
+  <a href="#s5"><span class="num">05</span> 两种实现对比</a>
+  <a href="#s6"><span class="num">06</span> 结论</a>
+</nav>
+
+<div id="page-num">1 / 6</div>
+<div class="page-ctrl">
+  <button id="prev-btn" aria-label="上一页">▲</button>
+  <button id="next-btn" aria-label="下一页">▼</button>
+</div>
+<button id="to-top" aria-label="返回顶部">⇧</button>
+
+<!-- ================= Section 1 : Cover ================= -->
+<section class="s" id="s1">
+  <div class="inner" style="text-align:center">
+    <div class="tag">AI Agent 经典设计模式 · 02</div>
+    <h1>Plan-and-Execute</h1>
+    <p class="sub" style="margin-top:8px">先想清楚，再动手</p>
+    <div class="divider" style="margin:28px auto"></div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin:32px 0">
+      <div style="padding:14px 28px;border-radius:12px;background:rgba(129,140,248,0.08);border:1px solid rgba(129,140,248,0.25);font-size:17px;color:var(--text-dim)">📦 LangChain · plan-and-execute agents</div>
+      <div style="padding:14px 28px;border-radius:12px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.25);font-size:17px;color:var(--text-dim)">⚙️ Claude Code · queryLoop 泄露源码</div>
+    </div>
+    <p style="font-size:clamp(18px,2vw,24px);color:var(--text-dim);max-width:860px;margin:0 auto;line-height:1.8">
+      ReAct 解决了"怎么做"，但让它去"重构后端、跑测试、提 PR"——<br/>做着做着就忘了最初要干嘛。<br/>Plan-and-Execute 把规划与执行显式分离，同一个模式，两种落地。
+    </p>
+    <p style="margin-top:56px;font-size:13px;color:var(--text-dim);opacity:0.5;letter-spacing:2px">↓ SCROLL TO EXPLORE ↓</p>
+  </div>
+</section>
+
+<!-- ================= Section 2 : ReAct 局限 ================= -->
+<section class="s" id="s2">
+  <div class="inner">
+    <h2>ReAct 的局限</h2>
+    <div class="divider"></div>
+    <p class="sub">规划和执行是两种不同的认知任务</p>
+
+    <div class="ba-compare">
+      <div class="ba-box before">
+        <h4 style="color:var(--red)">❌ ReAct 在长任务的困境</h4>
+        <div style="margin-top:20px">
+          <p><strong style="color:#fda4af">全局目标漂移</strong><br/>做着做着忘了最初要干嘛，在某个细节里越陷越深，全局目标早就丢了。</p>
+          <p style="margin-top:16px"><strong style="color:#fda4af">认知模式冲突</strong><br/>规划需要全局视角、延迟判断；执行需要聚焦当前、快速行动。让同一个循环同时承担这两件事，本身就是矛盾的。</p>
+        </div>
+      </div>
+      <div class="ba-arrow">➔</div>
+      <div class="ba-box after">
+        <h4 style="color:var(--accent2)">✅ Plan-and-Execute 的解法</h4>
+        <div style="margin-top:20px">
+          <p><strong style="color:#a5b4fc">三个阶段各司其职</strong><br/>Plan 阶段列出任务清单；Execute 阶段逐步执行；Re-plan 重新评估是否需要调整。</p>
+          <p style="margin-top:16px"><strong style="color:#a5b4fc">计划可检查、可约束</strong><br/>Plan 阶段的输出要足够具体，让 Execute 阶段照着走、不会走岔。计划生成后可以插入人工审核，批准后才执行。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-grid" style="margin-top:40px">
+      <div class="card" style="border-color:rgba(129,140,248,.35);text-align:center">
+        <div class="icon">🗺️</div>
+        <h4 style="color:var(--accent2)">Plan 阶段</h4>
+        <p>接收用户目标<br/>列出详细的任务清单<br/>定义依赖与完成标准<br/><em style="font-size:14px;opacity:0.7">不下场执行工具</em></p>
+      </div>
+      <div class="card" style="border-color:rgba(52,211,153,.35);text-align:center">
+        <div class="icon">⚡</div>
+        <h4 style="color:var(--green)">Execute 阶段</h4>
+        <p>接收 Plan 的任务清单<br/>翻译为工具调用与操作<br/>实时推进执行<br/><em style="font-size:14px;opacity:0.7">不操心整体走向</em></p>
+      </div>
+      <div class="card" style="border-color:rgba(251,191,36,.35);text-align:center">
+        <div class="icon">🔄</div>
+        <h4 style="color:var(--orange)">Re-plan</h4>
+        <p>每轮执行后重新评估<br/>任务完成？计划还对？<br/>决定是否继续或调整<br/><em style="font-size:14px;opacity:0.7">与 ReAct 的根本区别</em></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 3 : LangChain 模式定义 ================= -->
+<section class="s" id="s3">
+  <div class="inner">
+    <h2>LangChain：模式定义</h2>
+    <div class="divider"></div>
+    <p class="sub">plan-and-execute agents · 工程实践的归纳</p>
+
+    <div class="quote" style="border-left-color:var(--accent2);background:rgba(129,140,248,0.05);margin-bottom:40px">
+      <strong>核心流程三步：</strong>Planner 先列出多步任务清单 → Executor 逐步执行 → 系统触发 Re-planning。Planner 再次判断：任务完成了就结束，还没完就生成新的任务清单，再跑一轮 Execute。
+    </div>
+
+    <div class="card-grid">
+      <div class="card" style="border-color:rgba(129,140,248,.35)">
+        <div class="icon">🗺️</div>
+        <h4 style="color:var(--accent2)">① Planner 生成计划</h4>
+        <p>接到用户目标后，输出结构化任务清单：先做什么、后做什么、依赖关系、完成标准。Planner 不负责动手——它只管"想"。</p>
+      </div>
+      <div class="card" style="border-color:rgba(52,211,153,.35)">
+        <div class="icon">⚡</div>
+        <h4 style="color:var(--green)">② Executor 逐步执行</h4>
+        <p>拿到任务清单后，Executor 逐步执行——把每一步翻译成工具调用和具体操作。Executor 不操心全局走向。</p>
+      </div>
+      <div class="card" style="border-color:rgba(251,191,36,.35)">
+        <div class="icon">🔄</div>
+        <h4 style="color:var(--orange)">③ Re-planning 循环</h4>
+        <p>执行结束后，系统主动触发 Re-planning。Planner 再次判断：任务完成了就结束，还没完就生成新的任务清单，再跑一轮 Execute，如此循环直到完成。</p>
+      </div>
+    </div>
+
+    <div class="quote" style="margin-top:40px;font-size:clamp(17px,1.8vw,22px);border-left-color:var(--green);background:linear-gradient(90deg,rgba(52,211,153,0.07),transparent)">
+      ReAct 是"边想边做，走哪算哪"；<br/>Plan-and-Execute 是"<strong>先想清楚，做完再看是否要重新想</strong>"。
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 4 : Claude Code 源码落地 ================= -->
+<section class="s" id="s4">
+  <div class="inner">
+    <h2>Claude Code：源码落地</h2>
+    <div class="divider"></div>
+    <p class="sub">Plan · Execute · Re-plan 三阶段落地</p>
+
+    <div class="card-grid" style="margin-bottom:32px">
+      <div class="card" style="border-color:rgba(129,140,248,.35)">
+        <div class="icon">🗺️</div>
+        <h4 style="color:var(--accent2)">① Plan 阶段</h4>
+        <p>模型调用 <code style="color:var(--accent2)">EnterPlanMode</code>，权限切到 plan。权限一切换，系统就会拒绝其他文件的写操作——这是强制约束，不是靠模型自觉。模型只能探索代码库、设计方案，产出是一份计划文件。</p>
+      </div>
+      <div class="card" style="border-color:rgba(52,211,153,.35)">
+        <div class="icon">⚡</div>
+        <h4 style="color:var(--green)">② Execute 阶段</h4>
+        <p>模型调用 <code style="color:var(--green)">ExitPlanMode</code> 提交计划，用户审批后权限恢复。模型照着计划文件开始改代码——写操作重新可用。</p>
+      </div>
+      <div class="card" style="border-color:rgba(251,191,36,.35)">
+        <div class="icon">🔄</div>
+        <h4 style="color:var(--orange)">③ Re-plan</h4>
+        <p>Re-plan 不是 Execute 之后才触发的独立步骤，而是嵌在 Execute 里的能力。模型在执行过程中持续参照计划文件，它是“接下来做什么”的唯一依据。发现计划有问题，直接改文件就行——不需要等执行结束，也不需要系统触发。</p>
+      </div>
+    </div>
+
+    <p style="font-size:clamp(15px,1.4vw,18px);color:var(--text-dim);margin-bottom:16px">底层：三个阶段跑在同一个 <code style="color:var(--accent);background:rgba(56,189,248,0.1);padding:2px 8px;border-radius:6px">queryLoop</code>（while(true)）里，靠一个权限值划边界，靠一个文件做交接。</p>
+
+    <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);background:var(--code-bg);box-shadow:0 4px 24px rgba(0,0,0,.4);font-family:ui-monospace,'Fira Code','JetBrains Mono',Consolas,monospace;font-size:clamp(13px,1.1vw,16px);line-height:1.85;position:relative">
+      <div style="position:absolute;top:10px;right:16px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);opacity:0.7">TypeScript</div>
+
+      <div style="border-bottom:1px solid rgba(129,140,248,0.2)">
+        <div style="background:rgba(129,140,248,0.08);border-left:4px solid var(--accent2);padding:6px 20px">
+          <span style="font-size:11px;font-weight:700;color:var(--accent2);letter-spacing:2px">�️ Plan：EnterPlanMode 切到 'plan'</span>
+        </div>
+        <pre style="margin:0;padding:12px 32px;color:#e2e8f0;white-space:pre;overflow-x:auto;border-left:4px solid var(--accent2)">context.<span class="code-fn">setAppState</span>({ toolPermissionContext: { mode: <span class="code-str">'plan'</span> } })
+<span class="code-cm">// 写操作工具检查权限 → 拒绝执行</span>
+<span class="code-cm">// 模型探索代码库、写计划文件</span></pre>
+      </div>
+
+      <div>
+        <div style="background:rgba(52,211,153,0.08);border-left:4px solid var(--green);padding:6px 20px">
+          <span style="font-size:11px;font-weight:700;color:var(--green);letter-spacing:2px">⚡ Execute：ExitPlanMode 用户审批后恢复</span>
+        </div>
+        <pre style="margin:0;padding:12px 32px 24px;color:#e2e8f0;white-space:pre;overflow-x:auto;border-left:4px solid var(--green)">context.<span class="code-fn">setAppState</span>({ toolPermissionContext: { mode: prePlanMode } })
+<span class="code-cm">// mode 恢复到进入前的状态，写操作重新可用</span>
+<span class="code-cm">// 计划文件随时可改 → Re-plan 无需额外机制</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 5 : 两种实现对比 ================= -->
+<section class="s" id="s5">
+  <div class="inner">
+    <h2>两种实现对比</h2>
+    <div class="divider"></div>
+    <p class="sub">同一个模式，不同的工程选择</p>
+
+    <div class="ba-compare">
+      <div class="ba-box" style="border-color:rgba(129,140,248,.4);background:linear-gradient(180deg,rgba(129,140,248,0.06) 0%,transparent 100%)">
+        <h4 style="color:var(--accent2)">📦 LangChain 路径</h4>
+        <p style="margin-top:16px;font-size:20px"><strong style="color:#fff">架构分离</strong></p>
+        <p style="font-size:18px">Planner 和 Executor 是<strong style="color:#a5b4fc">两个独立组件</strong></p>
+        <p style="font-size:18px">Executor 内部跑自己的 ReAct 循环</p>
+        <p style="font-size:18px">Re-planning 由<strong style="color:#a5b4fc">系统主动触发</strong>，Planner 重新评估</p>
+        <p style="font-size:16px;opacity:0.7;margin-top:16px;margin-bottom:0">两个角色 · 两套循环 · 一个正式 Re-planning 入口</p>
+      </div>
+      <div class="ba-arrow">vs</div>
+      <div class="ba-box" style="border-color:rgba(52,211,153,.4);background:linear-gradient(180deg,rgba(52,211,153,0.06) 0%,transparent 100%)">
+        <h4 style="color:var(--green)">⚙️ Claude Code 路径</h4>
+        <p style="margin-top:16px;font-size:20px"><strong style="color:#fff">状态切换</strong></p>
+        <p style="font-size:18px">同一个 while(true) 循环 <strong style="color:#6ee7b7">跑全程</strong></p>
+        <p style="font-size:18px">靠 <code style="color:var(--green);font-size:16px">toolPermissionContext.mode</code> 区分阶段</p>
+        <p style="font-size:18px">Re-plan <strong style="color:#6ee7b7">嵌在 Execute 里</strong>——模型随时直接改计划文件</p>
+        <p style="font-size:16px;opacity:0.7;margin-top:16px;margin-bottom:0">一个循环 · 权限值变化 · 计划文件串联</p>
+      </div>
+    </div>
+
+    <div class="quote" style="margin-top:32px;font-size:clamp(17px,1.8vw,22px);border-left-color:var(--green);background:linear-gradient(90deg,rgba(52,211,153,0.07),transparent)">
+      Claude Code 的 Plan Mode 也是 Plan-and-Execute——先规划、后执行、中间有审批边界，<strong>三条全满足</strong>。<br/>只是实现手法不同：不拆组件，靠权限状态在同一个 while(true) 循环里跑完 Plan、Execute、Re-plan 三个阶段。<br/><span style="opacity:0.75">有意思的地方在于：这个循环本身是 ReAct 的机制实现。Plan-and-Execute 是在它之上，靠权限状态和计划文件构建出来的模式。同一个循环，不同的抽象层级。</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 6 : 结论 ================= -->
+<section class="s" id="s6">
+  <div class="inner" style="text-align:center">
+    <h2>结论</h2>
+    <div class="divider" style="margin:16px auto"></div>
+
+    <div class="quote" style="font-size:clamp(20px,2.8vw,32px);text-align:center;border-left:none;background:transparent;box-shadow:none;line-height:1.65;margin-top:40px;padding:0">
+      先规划、再执行、<strong style="color:var(--accent2)">随时能重新评估</strong>，<br/>是让 Agent 真正<strong style="color:var(--green)">走完长任务</strong>的核心设计。
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:56px;text-align:left">
+      <div style="padding:32px;border-radius:16px;background:rgba(129,140,248,0.07);border:1px solid rgba(129,140,248,0.2)">
+        <p style="font-size:13px;font-weight:700;color:var(--accent2);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">📦 LangChain 路径</p>
+        <p style="font-size:20px;color:var(--text-dim);margin:0;line-height:1.7">架构分离——Planner 和 Executor 各管各的，Re-planning 由系统主动触发。</p>
+      </div>
+      <div style="padding:32px;border-radius:16px;background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.2)">
+        <p style="font-size:13px;font-weight:700;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">⚙️ Claude Code 路径</p>
+        <p style="font-size:20px;color:var(--text-dim);margin:0;line-height:1.7">Claude Code 用状态切换——权限值划边界，计划文件传意图，不拆组件、不新增机制。</p>
+      </div>
+    </div>
+
+    <p style="font-size:clamp(16px,1.6vw,20px);color:var(--text-dim);margin-top:48px;line-height:1.8;max-width:860px;margin-left:auto;margin-right:auto">
+      两种落地思路，解决的是同一个问题：<strong style="color:#fff">让 Agent 在长任务里跑得远还不跑偏。</strong>
+    </p>
+
+    <div style="margin-top:48px;font-size:13px;color:var(--text-dim);opacity:0.4;letter-spacing:2px">
+      Agent Design Patterns · 02 · Plan-and-Execute
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const sections = document.querySelectorAll('.s');
+  const navLinks = document.querySelectorAll('#nav a');
+  const nav = document.getElementById('nav');
+  const menuBtn = document.getElementById('menu-btn');
+  const progress = document.getElementById('progress');
+  const toTop = document.getElementById('to-top');
+  let current = 0;
+  const total = sections.length;
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        const idx = Array.from(sections).indexOf(e.target);
+        current = idx;
+        updateNav(idx);
+        updateProgress();
+      }
+    });
+  }, { threshold: 0.1 });
+  sections.forEach(s => io.observe(s));
+
+  function updateNav(idx) {
+    navLinks.forEach((a, i) => a.classList.toggle('active', i === idx));
+  }
+  function updateProgress() {
+    const pct = ((current + 1) / total) * 100;
+    progress.style.height = pct + '%';
+    toTop.classList.toggle('show', current > 0);
+    const pageNumEl = document.getElementById('page-num');
+    if (pageNumEl) pageNumEl.textContent = (current + 1) + ' / ' + total;
+  }
+
+  menuBtn.addEventListener('click', () => {
+    nav.classList.toggle('open');
+    menuBtn.textContent = nav.classList.contains('open') ? '✕' : '☰';
+  });
+  navLinks.forEach(a => a.addEventListener('click', () => {
+    nav.classList.remove('open');
+    menuBtn.textContent = '☰';
+  }));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+      e.preventDefault(); goTo(current + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+      e.preventDefault(); goTo(current - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault(); goTo(0);
+    } else if (e.key === 'End') {
+      e.preventDefault(); goTo(total - 1);
+    }
+  });
+
+  document.getElementById('prev-btn').addEventListener('click', () => goTo(current - 1));
+  document.getElementById('next-btn').addEventListener('click', () => goTo(current + 1));
+  toTop.addEventListener('click', () => goTo(0));
+
+  function goTo(idx) {
+    if (idx < 0 || idx >= total) return;
+    sections[idx].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  let wheelLock = false;
+  window.addEventListener('wheel', e => {
+    if (wheelLock) return;
+    wheelLock = true;
+    if (e.deltaY > 30) goTo(current + 1);
+    else if (e.deltaY < -30) goTo(current - 1);
+    setTimeout(() => wheelLock = false, 800);
+  }, { passive: true });
+
+  let touchY = 0;
+  window.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchend', e => {
+    const dy = touchY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) > 60) {
+      dy > 0 ? goTo(current + 1) : goTo(current - 1);
+    }
+  }, { passive: true });
+})();
+</script>
+</body>
+</html>

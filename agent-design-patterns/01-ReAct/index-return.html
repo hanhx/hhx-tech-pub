@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>queryLoop 的所有退出路径</title>
+<meta name="theme-color" content="#1a1a2e"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#0f172a;--bg2:#1e293b;--bg3:#334155;
+  --accent:#38bdf8;--accent2:#818cf8;--green:#34d399;--orange:#fbbf24;--red:#fb7185;
+  --text:#f8fafc;--text-dim:#94a3b8;--code-bg:#0d1117;
+  --card-bg:rgba(255,255,255,0.03);--card-border:rgba(255,255,255,0.08);
+}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;background:radial-gradient(circle at 50% 0%,#1e293b 0%,var(--bg1) 100%);color:var(--text);line-height:1.8;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:linear-gradient(rgba(56,189,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.03) 1px,transparent 1px);background-size:40px 40px;z-index:-2;pointer-events:none}
+
+.page{max-width:1600px;margin:0 auto;padding:60px 48px 120px}
+
+h1{font-size:clamp(36px,5vw,56px);font-weight:900;line-height:1.2;margin-bottom:12px;background:linear-gradient(135deg,#fff 20%,var(--accent) 80%,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{font-size:clamp(16px,2vw,22px);color:var(--text-dim);margin-bottom:48px}
+.subtitle code{color:var(--accent);background:rgba(56,189,248,0.1);padding:2px 8px;border-radius:6px;font-size:0.9em}
+
+/* ── 中心流程图（横向） ── */
+.flow{display:flex;align-items:center;gap:0;margin:0 0 56px;width:100%;padding:20px 0;justify-content:space-between}
+
+.node-box{border-radius:14px;padding:14px 22px;text-align:center;font-family:ui-monospace,"Fira Code","JetBrains Mono",Consolas,monospace;font-size:clamp(13px,1.1vw,17px);font-weight:700;white-space:nowrap}
+.node-box.loop{border:2px solid rgba(129,140,248,0.5);background:linear-gradient(135deg,rgba(129,140,248,0.15),rgba(129,140,248,0.05));color:var(--accent2);box-shadow:0 0 24px rgba(129,140,248,0.15);font-size:clamp(14px,1.2vw,18px)}
+.node-box.thought{border:1.5px solid rgba(56,189,248,0.4);background:linear-gradient(135deg,rgba(56,189,248,0.12),rgba(56,189,248,0.04));color:var(--accent);box-shadow:0 0 16px rgba(56,189,248,0.1)}
+.node-box.action{border:1.5px solid rgba(129,140,248,0.4);background:linear-gradient(135deg,rgba(129,140,248,0.12),rgba(129,140,248,0.04));color:var(--accent2);box-shadow:0 0 16px rgba(129,140,248,0.1)}
+.node-box.obs{border:1.5px solid rgba(52,211,153,0.4);background:linear-gradient(135deg,rgba(52,211,153,0.12),rgba(52,211,153,0.04));color:var(--green);box-shadow:0 0 16px rgba(52,211,153,0.1)}
+.node-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.6;margin-bottom:2px}
+
+.flow-arrow{display:flex;align-items:center;padding:0 4px;color:var(--text-dim);opacity:0.5;flex:1}
+.flow-arrow .arrow-line{height:2px;flex:1;background:currentColor}
+.flow-arrow .arrow-head{width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:8px solid currentColor}
+
+.flow-footer{display:none}
+.flow-loop-back{display:none}
+
+/* ── 退出分支 ── */
+.exits{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-top:16px}
+
+.exit-card{background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.015) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px 28px 24px;position:relative;overflow:hidden;transition:transform .3s,box-shadow .3s;backdrop-filter:blur(10px)}
+.exit-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0}
+.exit-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,0.3)}
+
+.exit-card.happy::before{background:linear-gradient(90deg,var(--green),#6ee7b7)}
+.exit-card.happy{border-color:rgba(52,211,153,0.25)}
+.exit-card.guard::before{background:linear-gradient(90deg,var(--orange),#fcd34d)}
+.exit-card.guard{border-color:rgba(251,191,36,0.25)}
+.exit-card.abort::before{background:linear-gradient(90deg,var(--red),#fda4af)}
+.exit-card.abort{border-color:rgba(251,113,133,0.25)}
+.exit-card.error::before{background:linear-gradient(90deg,#f472b6,#e879f9)}
+.exit-card.error{border-color:rgba(244,114,182,0.25)}
+
+.exit-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.exit-icon{font-size:28px;flex-shrink:0}
+.exit-reason{font-family:ui-monospace,"Fira Code",monospace;font-size:clamp(14px,1.2vw,17px);font-weight:700;padding:4px 14px;border-radius:8px}
+
+.exit-card.happy .exit-reason{color:var(--green);background:rgba(52,211,153,0.1)}
+.exit-card.guard .exit-reason{color:var(--orange);background:rgba(251,191,36,0.1)}
+.exit-card.abort .exit-reason{color:var(--red);background:rgba(251,113,133,0.1)}
+.exit-card.error .exit-reason{color:#f0abfc;background:rgba(232,121,249,0.1)}
+
+.exit-desc{font-size:clamp(14px,1.2vw,17px);color:var(--text-dim);line-height:1.7;margin-bottom:12px}
+.exit-line{font-family:ui-monospace,"Fira Code",monospace;font-size:12px;color:var(--text-dim);opacity:0.6;display:flex;align-items:center;gap:6px}
+.exit-line::before{content:'';width:8px;height:1px;background:currentColor;flex-shrink:0}
+
+.exit-code{background:var(--code-bg);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px 18px;margin-top:10px;font-family:ui-monospace,"Fira Code",monospace;font-size:clamp(12px,1vw,14px);line-height:1.7;color:#e2e8f0;overflow-x:auto}
+.exit-code .kw{color:#c792ea}
+.exit-code .str{color:#c3e88d}
+.exit-code .cm{color:#546e7a;font-style:italic}
+.exit-code .fn{color:#82aaff}
+.exit-code .num{color:#f78c6c}
+
+/* ── 分类标题 ── */
+.category{margin-top:56px;margin-bottom:24px;display:flex;align-items:center;gap:14px}
+.category h2{font-size:clamp(22px,2.5vw,32px);font-weight:700;color:#fff}
+.cat-badge{font-size:13px;font-weight:700;padding:5px 14px;border-radius:20px;letter-spacing:1.5px;text-transform:uppercase}
+.cat-badge.happy{background:rgba(52,211,153,0.15);color:var(--green);border:1px solid rgba(52,211,153,0.3)}
+.cat-badge.guard{background:rgba(251,191,36,0.15);color:var(--orange);border:1px solid rgba(251,191,36,0.3)}
+.cat-badge.abort{background:rgba(251,113,133,0.15);color:var(--red);border:1px solid rgba(251,113,133,0.3)}
+.cat-badge.error{background:rgba(232,121,249,0.15);color:#e879f9;border:1px solid rgba(232,121,249,0.3)}
+
+/* ── 底部总结 ── */
+.summary{margin-top:64px;background:linear-gradient(135deg,rgba(56,189,248,0.06),rgba(129,140,248,0.06));border:1px solid rgba(56,189,248,0.15);border-radius:20px;padding:36px 40px;position:relative;overflow:hidden}
+.summary::before{content:'"';position:absolute;right:28px;top:-10px;font-size:140px;color:rgba(255,255,255,0.03);font-family:serif;line-height:1}
+.summary h3{font-size:clamp(20px,2vw,26px);color:var(--accent);margin-bottom:14px;font-weight:700}
+.summary p{font-size:clamp(15px,1.3vw,19px);color:var(--text-dim);line-height:1.8}
+.summary strong{color:#fff}
+
+.back-link{display:inline-flex;align-items:center;gap:8px;margin-top:40px;color:var(--accent);font-size:15px;text-decoration:none;opacity:0.7;transition:opacity .2s}
+.back-link:hover{opacity:1}
+
+@media(max-width:768px){
+  .page{padding:32px 16px 80px}
+  .exits{grid-template-columns:1fr}
+  .flow{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <h1>while(true) 的所有出口</h1>
+  <p class="subtitle"><code>query.ts</code> · <code>queryLoop()</code> — 8 种退出路径完整解析</p>
+
+  <!-- ── 中心流程图 ── -->
+  <div class="flow">
+    <div class="node-box loop">while (true) {</div>
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+    <div class="node-box thought"><div class="node-label">THOUGHT</div>callModel()</div>
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+    <div class="node-box action"><div class="node-label">ACTION</div>runTools()</div>
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+    <div class="node-box obs"><div class="node-label">OBSERVATION</div>state update</div>
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+    <div class="node-box loop">}</div>
+  </div>
+
+  <!-- ═══════ Category 1: 正常退出 ═══════ -->
+  <div class="category">
+    <h2>正常完成</h2>
+    <span class="cat-badge happy">Happy Path</span>
+  </div>
+  <div class="exits">
+    <div class="exit-card happy">
+      <div class="exit-header">
+        <span class="exit-icon">✅</span>
+        <span class="exit-reason">completed</span>
+      </div>
+      <p class="exit-desc">
+        模型返回的内容中<strong style="color:#fff">没有 tool_use 块</strong>（<code style="color:var(--green)">needsFollowUp === false</code>），说明任务做完了，不需要再调工具。这是 <strong style="color:#fff">ReAct 循环唯一的正常出口</strong>。
+      </p>
+      <div class="exit-code">
+<span class="kw">if</span> (!needsFollowUp) <span class="kw">return</span> { reason: <span class="str">'completed'</span> }  <span class="cm">// line 1264 & 1357</span>
+      </div>
+      <div class="exit-line">两处触发：流式结束后 (L1264)、stop hook 放行后 (L1357)</div>
+    </div>
+  </div>
+
+  <!-- ═══════ Category 2: 安全阀 ═══════ -->
+  <div class="category">
+    <h2>安全阀 — 防止无限循环</h2>
+    <span class="cat-badge guard">Guard Rails</span>
+  </div>
+  <div class="exits">
+    <div class="exit-card guard">
+      <div class="exit-header">
+        <span class="exit-icon">🔄</span>
+        <span class="exit-reason">max_turns</span>
+      </div>
+      <p class="exit-desc">
+        调用方通过 <code style="color:var(--orange)">maxTurns</code> 参数设定循环上限。每轮 <code>turnCount + 1</code>，超过上限就强制退出。<strong style="color:#fff">这是"如果永远不 completed 怎么办"的直接答案。</strong>
+      </p>
+      <div class="exit-code">
+<span class="kw">const</span> nextTurnCount = turnCount + <span class="num">1</span>
+<span class="kw">if</span> (maxTurns && nextTurnCount > maxTurns) {
+  <span class="kw">return</span> { reason: <span class="str">'max_turns'</span>, turnCount: nextTurnCount }  <span class="cm">// line 1711</span>
+}
+      </div>
+      <div class="exit-line">SDK / headless 模式的核心防护</div>
+    </div>
+
+    <div class="exit-card guard">
+      <div class="exit-header">
+        <span class="exit-icon">📏</span>
+        <span class="exit-reason">blocking_limit</span>
+      </div>
+      <p class="exit-desc">
+        每轮开始前检查上下文 token 数。当消息历史撑满上下文窗口（且 auto-compact 未开启），直接拒绝继续。
+      </p>
+      <div class="exit-code">
+<span class="kw">const</span> { isAtBlockingLimit } = <span class="fn">calculateTokenWarningState</span>(...)
+<span class="kw">if</span> (isAtBlockingLimit) {
+  <span class="kw">return</span> { reason: <span class="str">'blocking_limit'</span> }  <span class="cm">// line 646</span>
+}
+      </div>
+      <div class="exit-line">上下文窗口的硬刹车</div>
+    </div>
+
+    <div class="exit-card guard">
+      <div class="exit-header">
+        <span class="exit-icon">🛑</span>
+        <span class="exit-reason">stop_hook_prevented</span>
+      </div>
+      <p class="exit-desc">
+        stop hook 机制可以在模型"以为做完了"时阻止退出并注入额外指令。但如果 stop hook 本身判定不应继续，也会终止循环。
+      </p>
+      <div class="exit-code">
+<span class="kw">return</span> { reason: <span class="str">'stop_hook_prevented'</span> }  <span class="cm">// line 1279</span>
+      </div>
+      <div class="exit-line">stop hook 的安全退出</div>
+    </div>
+
+    <div class="exit-card guard">
+      <div class="exit-header">
+        <span class="exit-icon">🪝</span>
+        <span class="exit-reason">hook_stopped</span>
+      </div>
+      <p class="exit-desc">
+        工具执行完毕后，<code style="color:var(--orange)">canUseTool</code> hook 判定不应继续（如权限拒绝、安全策略触发）。与 <code>stop_hook_prevented</code> 不同——后者在"无工具调用"路径，这个在"工具执行后"路径。
+      </p>
+      <div class="exit-code">
+<span class="kw">if</span> (shouldPreventContinuation) {
+  <span class="kw">return</span> { reason: <span class="str">'hook_stopped'</span> }  <span class="cm">// line 1520</span>
+}
+      </div>
+      <div class="exit-line">工具执行后的 hook 拦截</div>
+    </div>
+  </div>
+
+  <!-- ═══════ Category 3: 用户中断 ═══════ -->
+  <div class="category">
+    <h2>用户中断</h2>
+    <span class="cat-badge abort">Abort</span>
+  </div>
+  <div class="exits">
+    <div class="exit-card abort">
+      <div class="exit-header">
+        <span class="exit-icon">⏹️</span>
+        <span class="exit-reason">aborted_streaming</span>
+      </div>
+      <p class="exit-desc">
+        用户在<strong style="color:#fff">模型流式输出阶段</strong>按下 Ctrl+C 或触发 abort signal。流式立即终止，为未完成的 tool_use 块补全 error tool_result。
+      </p>
+      <div class="exit-code">
+<span class="kw">if</span> (toolUseContext.abortController.signal.aborted) {
+  <span class="kw">yield*</span> <span class="fn">yieldMissingToolResultBlocks</span>(...)  <span class="cm">// 补全孤立的 tool_use</span>
+  <span class="kw">return</span> { reason: <span class="str">'aborted_streaming'</span> }  <span class="cm">// line 1051</span>
+}
+      </div>
+      <div class="exit-line">callModel 之后、runTools 之前检查</div>
+    </div>
+
+    <div class="exit-card abort">
+      <div class="exit-header">
+        <span class="exit-icon">🔧</span>
+        <span class="exit-reason">aborted_tools</span>
+      </div>
+      <p class="exit-desc">
+        用户在<strong style="color:#fff">工具执行阶段</strong>中断。已经在跑的工具会收到 abort signal，尚未开始的工具跳过执行。
+      </p>
+      <div class="exit-code">
+<span class="kw">if</span> (toolUseContext.abortController.signal.aborted) {
+  <span class="kw">return</span> { reason: <span class="str">'aborted_tools'</span> }  <span class="cm">// line 1515</span>
+}
+      </div>
+      <div class="exit-line">runTools 之后检查</div>
+    </div>
+  </div>
+
+  <!-- ═══════ Category 4: 错误退出 ═══════ -->
+  <div class="category">
+    <h2>错误退出</h2>
+    <span class="cat-badge error">Error</span>
+  </div>
+  <div class="exits">
+    <div class="exit-card error">
+      <div class="exit-header">
+        <span class="exit-icon">💥</span>
+        <span class="exit-reason">model_error</span>
+      </div>
+      <p class="exit-desc">
+        API 调用失败、网络超时、服务端错误等。catch 块捕获后直接退出，不会无限重试。
+      </p>
+      <div class="exit-code">
+<span class="kw">catch</span> (error) {
+  <span class="kw">return</span> { reason: <span class="str">'model_error'</span>, error }  <span class="cm">// line 996</span>
+}
+      </div>
+      <div class="exit-line">API 层的最终兜底</div>
+    </div>
+
+    <div class="exit-card error">
+      <div class="exit-header">
+        <span class="exit-icon">📄</span>
+        <span class="exit-reason">prompt_too_long</span>
+      </div>
+      <p class="exit-desc">
+        服务端返回 prompt 过长错误，且 reactive compact / context collapse 恢复失败后退出。
+      </p>
+      <div class="exit-code">
+<span class="kw">return</span> { reason: <span class="str">'prompt_too_long'</span> }  <span class="cm">// line 1175 & 1182</span>
+      </div>
+      <div class="exit-line">reactive compact 救不回来时的退路</div>
+    </div>
+
+    <div class="exit-card error">
+      <div class="exit-header">
+        <span class="exit-icon">🖼️</span>
+        <span class="exit-reason">image_error</span>
+      </div>
+      <p class="exit-desc">
+        图片尺寸超限或 resize 失败时退出。
+      </p>
+      <div class="exit-code">
+<span class="kw">return</span> { reason: <span class="str">'image_error'</span> }  <span class="cm">// line 977</span>
+      </div>
+      <div class="exit-line">ImageSizeError / ImageResizeError</div>
+    </div>
+  </div>
+
+  <!-- ── 总结 ── -->
+  <div class="summary">
+    <h3>为什么幻灯片里只写了 completed？</h3>
+    <p>
+      因为 <code style="color:var(--accent)">completed</code> 是 <strong>ReAct 模式本身的退出条件</strong>——模型认为任务完成、不再调用工具。<br>
+      其余 7 种退出都是<strong>工程层的安全阀</strong>：防无限循环（<code style="color:var(--orange)">max_turns</code>）、防上下文溢出（<code style="color:var(--orange)">blocking_limit</code>）、hook 拦截（<code style="color:var(--orange)">stop_hook_prevented</code> / <code style="color:var(--orange)">hook_stopped</code>）、响应用户中断（<code style="color:var(--red)">aborted_*</code>）、处理不可恢复错误（<code style="color:#e879f9">model_error</code>）。<br><br>
+      <strong>while(true) 从来不是真正的死循环</strong>——生产代码里，至少有 8 道出口保证它一定会停。
+    </p>
+  </div>
+
+  <a href="index.html" class="back-link">← 返回 ReAct 全景解析</a>
+
+</div>
+
+</body>
+</html>

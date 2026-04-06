@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<title>Claude Code 记忆系统 · 全局架构图</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060d1a;--bg2:#071e36;--bg3:rgba(255,255,255,0.04);
+  --accent:#38bdf8;--accent2:#818cf8;--green:#34d399;--orange:#fbbf24;--red:#fb7185;
+  --text:#e2e8f0;--text-dim:#94a3b8;
+  --font:'PingFang SC','Microsoft YaHei',sans-serif;
+}
+body{font-family:var(--font);background:#111;display:flex;flex-direction:column;align-items:center;padding:40px;gap:20px}
+.export-btn{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:14px 32px;border-radius:10px;font-size:17px;font-weight:800;cursor:pointer;letter-spacing:1px;box-shadow:0 6px 20px rgba(34,197,94,0.35)}
+.export-btn:hover{filter:brightness(1.1)}
+
+/* ========== CANVAS ========== */
+#canvas{
+  width:1920px;height:1080px;position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse 70% 60% at 10% 20%, rgba(56,189,248,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 80%, rgba(129,140,248,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(52,211,153,0.06) 0%, transparent 55%),
+    linear-gradient(160deg,#060d1a 0%,#071524 40%,#060d1a 100%);
+  border:1px solid rgba(56,189,248,0.1);
+}
+#canvas::after{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 59px,rgba(255,255,255,0.015) 60px),
+             repeating-linear-gradient(90deg,transparent,transparent 59px,rgba(255,255,255,0.015) 60px);
+  pointer-events:none;z-index:0;
+}
+
+/* ===== HEADER ===== */
+.hdr{position:relative;z-index:1;padding:28px 48px 0;display:flex;align-items:center;justify-content:space-between}
+.hdr-left{display:flex;flex-direction:column;gap:6px}
+.series-tag{display:inline-flex;align-items:center;gap:10px;font-size:15px;color:var(--text-dim);letter-spacing:2px;font-weight:600}
+.series-tag span{background:var(--red);color:#fff;font-size:13px;font-weight:900;padding:3px 10px;border-radius:5px;letter-spacing:1px}
+.main-title{font-size:38px;font-weight:900;color:#fff;letter-spacing:4px;line-height:1}
+.main-title em{color:var(--accent);font-style:normal}
+.tagline{font-size:18px;color:var(--text-dim);margin-top:4px;letter-spacing:1px}
+.tagline strong{color:var(--orange)}
+.src-tag{font-size:13px;color:rgba(255,255,255,0.2);text-align:right;line-height:1.8;font-family:ui-monospace,monospace}
+
+/* ===== MAIN BODY ===== */
+.body{position:relative;z-index:1;display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr 24px 1fr;align-items:stretch;gap:0;padding:18px 48px 0;height:820px}
+
+/* ===== COLUMN BASE ===== */
+.col{display:flex;flex-direction:column;gap:10px}
+.col-hd{font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;padding:6px 12px;border-radius:6px;display:inline-block;margin-bottom:2px;align-self:flex-start}
+
+/* ===== ARROW ===== */
+.arr{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.arr-line{width:2px;flex:1;background:linear-gradient(180deg,transparent,rgba(255,255,255,0.12),transparent)}
+.arr-head{width:0;height:0;border-top:8px solid rgba(255,255,255,0.2);border-left:6px solid transparent;border-right:6px solid transparent}
+.arr-label{font-size:11px;color:rgba(255,255,255,0.2);writing-mode:vertical-rl;letter-spacing:2px;text-align:center}
+
+/* ===== CARD ===== */
+.card{border-radius:12px;padding:14px 16px;background:var(--bg3);border:1px solid rgba(255,255,255,0.07);flex-shrink:0}
+.card-title{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.card-title .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.card p{font-size:14px;color:var(--text-dim);line-height:1.7}
+.card code{font-family:ui-monospace,monospace;font-size:13px;color:var(--accent);background:rgba(56,189,248,0.08);padding:1px 5px;border-radius:3px}
+
+/* type pills */
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:2px}
+.typ{border-radius:8px;padding:10px 10px;font-size:13px;font-weight:700;line-height:1.4}
+.typ .tn{font-size:11px;font-family:ui-monospace,monospace;opacity:0.5;margin-bottom:2px}
+.typ.u{background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);color:#7dd3fc}
+.typ.f{background:rgba(129,140,248,0.08);border:1px solid rgba(129,140,248,0.2);color:#a5b4fc}
+.typ.p{background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);color:#6ee7b7}
+.typ.r{background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);color:#fcd34d}
+
+/* exclusion card */
+.excl{background:linear-gradient(135deg,rgba(251,113,133,0.06),transparent);border:1px solid rgba(251,113,133,0.18);border-radius:10px;padding:12px 14px}
+.excl-title{font-size:12px;font-weight:800;color:var(--red);letter-spacing:1px;margin-bottom:6px}
+.excl p{font-size:12px;color:var(--text-dim);line-height:1.6}
+
+/* memory.md card */
+.memmd{background:linear-gradient(135deg,rgba(56,189,248,0.08),transparent);border:1px solid rgba(56,189,248,0.2);border-radius:12px;padding:14px 16px}
+.memmd-title{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.memmd-badge{font-size:11px;background:rgba(251,113,133,0.15);color:var(--red);padding:2px 8px;border-radius:10px;border:1px solid rgba(251,113,133,0.25)}
+.memmd-code{background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-dim);line-height:1.8}
+.memmd-code .cm{opacity:0.35}
+.memmd-code .ln{color:var(--accent);opacity:0.9}
+.memmd-hint{font-size:11px;color:var(--text-dim);margin-top:8px;opacity:0.6}
+
+/* frontmatter card */
+.fmcard{background:linear-gradient(135deg,rgba(129,140,248,0.08),transparent);border:1px solid rgba(129,140,248,0.2);border-radius:12px;padding:14px 16px}
+.fmcard-title{font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:8px}
+.fmcard-code{background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;color:var(--accent2);line-height:1.9}
+.fmcard-code .key{color:var(--text-dim)}
+.fmcard-layers{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.fml{border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600}
+.fml.n{background:rgba(255,255,255,0.04);color:var(--text-dim)}
+.fml.d{background:rgba(251,113,133,0.06);border:1px solid rgba(251,113,133,0.15);color:#fca5a5}
+.fml span{opacity:0.5;font-weight:400}
+
+/* retrieval steps */
+.step{border-radius:10px;padding:13px 14px;display:flex;gap:10px;align-items:flex-start}
+.step-n{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;margin-top:1px}
+.step-body{display:flex;flex-direction:column}
+.step-title{font-size:14px;font-weight:700;margin-bottom:3px}
+.step-desc{font-size:12px;color:var(--text-dim);line-height:1.6}
+.step-desc code{font-family:ui-monospace,monospace;font-size:11px;padding:1px 4px;border-radius:3px}
+.step.s1{background:rgba(56,189,248,0.07);border:1px solid rgba(56,189,248,0.15)}
+.step.s1 .step-n{background:rgba(56,189,248,0.2);color:var(--accent)}
+.step.s1 .step-title{color:var(--accent)}
+.step.s1 code{color:var(--accent);background:rgba(56,189,248,0.1)}
+.step.s2{background:rgba(129,140,248,0.07);border:1px solid rgba(129,140,248,0.15)}
+.step.s2 .step-n{background:rgba(129,140,248,0.2);color:var(--accent2)}
+.step.s2 .step-title{color:var(--accent2)}
+.step.s2 code{color:var(--accent2);background:rgba(129,140,248,0.1)}
+.step.s3{background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.15)}
+.step.s3 .step-n{background:rgba(52,211,153,0.2);color:var(--green)}
+.step.s3 .step-title{color:var(--green)}
+.step.s3 code{color:var(--green);background:rgba(52,211,153,0.1)}
+
+/* maintenance cards */
+.mcard{border-radius:12px;padding:13px 14px}
+.mcard.dream{background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.18)}
+.mcard.team{background:rgba(129,140,248,0.06);border:1px solid rgba(129,140,248,0.18)}
+.mcard.fresh{background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.18)}
+.mcard-icon{font-size:24px;margin-bottom:6px}
+.mcard-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.mcard.dream .mcard-title{color:var(--accent)}
+.mcard.team .mcard-title{color:var(--accent2)}
+.mcard.fresh .mcard-title{color:var(--green)}
+.mcard p{font-size:12px;color:var(--text-dim);line-height:1.7}
+.mcard code{font-family:ui-monospace,monospace;font-size:11px}
+.phase-row{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.ph{font-size:11px;font-weight:700;padding:3px 7px;border-radius:4px;background:rgba(56,189,248,0.12);color:var(--accent)}
+.dir-row{display:flex;gap:6px;margin-top:6px}
+.dir{flex:1;border-radius:6px;padding:7px 8px;text-align:center;font-size:12px;font-weight:700}
+.dir.priv{background:rgba(251,191,36,0.1);color:var(--orange);border:1px solid rgba(251,191,36,0.2)}
+.dir.team{background:rgba(56,189,248,0.1);color:var(--accent);border:1px solid rgba(56,189,248,0.2)}
+.dir .dn{font-size:10px;opacity:0.6;font-weight:400}
+.fresh-warn{margin-top:6px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.15);border-radius:6px;padding:7px 9px;font-size:11px;color:var(--green);line-height:1.6}
+.verify-list{margin-top:6px;font-size:11px;color:var(--text-dim);line-height:1.8}
+.verify-list span{color:#fff;font-weight:600}
+
+/* ===== PHILOSOPHY ===== */
+.philosophy{position:relative;z-index:1;padding:12px 48px 20px;display:flex;align-items:center;justify-content:space-between}
+.phil-quote{font-size:20px;font-style:italic;color:var(--text-dim);letter-spacing:1px}
+.phil-quote strong{color:#fff}
+.phil-files{font-size:11px;color:rgba(255,255,255,0.18);font-family:ui-monospace,monospace}
+
+/* col headers */
+.ch-store{background:rgba(56,189,248,0.12);color:var(--accent)}
+.ch-save{background:rgba(56,189,248,0.1);color:var(--accent)}
+.ch-get{background:rgba(129,140,248,0.12);color:var(--accent2)}
+.ch-keep{background:rgba(52,211,153,0.12);color:var(--green)}
+.ch-input{background:rgba(255,255,255,0.06);color:var(--text-dim)}
+</style>
+</head>
+<body>
+<button class="export-btn" onclick="doExport()">📥 导出为 PNG</button>
+
+<div id="canvas">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="series-tag"><span>一张图讲清楚</span>上下文引擎 · 08</div>
+      <div class="main-title">Claude Code <em>源码</em> · 记忆系统全局架构</div>
+      <div class="tagline">从 <strong>memdir 源码</strong> 拆解三层机制 — 存得准 · 取得准 · 不过期</div>
+    </div>
+    <div class="src-tag">
+      src/memdir/memoryTypes.ts<br>
+      src/memdir/memdir.ts · memoryScan.ts<br>
+      src/memdir/findRelevantMemories.ts<br>
+      src/services/extractMemories/extractMemories.ts<br>
+      src/services/autoDream/autoDream.ts
+    </div>
+  </div>
+
+  <!-- BODY GRID -->
+  <div class="body">
+
+    <!-- COL 1: 存什么 -->
+    <div class="col">
+      <div class="col-hd ch-store">① 存什么</div>
+      <div class="card" style="background:linear-gradient(135deg,rgba(56,189,248,0.06),transparent);border-color:rgba(56,189,248,0.15);padding:10px 12px">
+        <div class="card-title" style="color:var(--text-dim);font-size:12px">闭合四类分类学约束</div>
+        <div class="type-grid">
+          <div class="typ u"><div class="tn">user</div>角色·目标·背景</div>
+          <div class="typ f"><div class="tn">feedback</div>纠偏·确认做法</div>
+          <div class="typ p"><div class="tn">project</div>目标·deadline</div>
+          <div class="typ r"><div class="tn">reference</div>外部系统指针</div>
+        </div>
+      </div>
+      <div class="excl">
+        <div class="excl-title">✗ 排除项（即使用户要求也不存）</div>
+        <p>代码模式 · 架构决策 · git 历史<br>文件结构 · CLAUDE.md 已有内容<br>临时会话状态<br><span style="color:var(--red);font-size:11px">grep / git / CLAUDE.md 可查的一律不存</span></p>
+      </div>
+      <div style="flex:1"></div>
+      <div style="font-size:12px;color:var(--text-dim);padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
+        <span style="color:#fff;font-weight:700">核心哲学</span><br>
+        只存工具查不到的<br>那部分认知
+      </div>
+    </div>
+
+    <!-- ARR 1 -->
+    <div class="arr">
+      <div class="arr-line"></div>
+      <div class="arr-label">写入</div>
+      <div class="arr-head"></div>
+      <div class="arr-line"></div>
+    </div>
+
+    <!-- COL 2: 存的机制 -->
+    <div class="col">
+      <div class="col-hd ch-save">② 存的机制</div>
+      <div class="memmd">
+        <div class="memmd-title">
+          MEMORY.md — 索引而非内容
+          <span class="memmd-badge">200行 / 25KB</span>
+        </div>
+        <div class="memmd-code">
+          <span class="cm"># 索引，不是内容</span><br>
+          <span class="ln">- [用户背景](user_role.md) — Go 老手 React 新手</span><br>
+          <span class="ln">- [测试规范](feedback_test.md) — 禁 mock DB</span><br>
+          <span class="ln">- [发布冻结](project_freeze.md) — 2026-04-03</span><br>
+          <span class="ln">- [监控看板](ref_grafana.md) — latency oncall</span>
+        </div>
+        <div class="memmd-hint">⚠ 超出截断 → 召回断链 · 每次会话启动自动注入 system prompt</div>
+      </div>
+      <div class="fmcard">
+        <div class="fmcard-title">Topic File — frontmatter 三字段</div>
+        <div class="fmcard-code">
+          ---<br>
+          <span class="key">name:</span> 用户背景信息<br>
+          <span class="key">description:</span> <span style="color:#fca5a5">Go 老手，初次接触 React，用后端类比</span><br>
+          <span class="key">type:</span> user<br>
+          ---
+        </div>
+        <div class="fmcard-layers">
+          <div class="fml n"><code style="font-size:11px;color:var(--accent2)">name</code> <span>— 文件标题，与内容同步</span></div>
+          <div class="fml d"><code style="font-size:11px;color:#fca5a5">description</code> <span>— </span><strong style="color:#fca5a5">给 Sonnet 读的</strong><span>，精准→召回准</span></div>
+          <div class="fml n"><code style="font-size:11px;color:var(--green)">type</code> <span>— 决定 scope 推荐（private / team）</span></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
+        <span style="color:var(--orange)">存储路径</span><br>
+        <code style="font-size:11px;color:var(--accent)">~/.claude/projects/&lt;git-root&gt;/memory/</code>
+      </div>
+    </div>
+
+    <!-- ARR 2 -->
+    <div class="arr">
+      <div class="arr-line"></div>
+      <div class="arr-label">读写</div>
+      <div class="arr-head"></div>
+      <div class="arr-line"></div>
+    </div>
+
+    <!-- COL 3: 取的机制 -->
+    <div class="col">
+      <div class="col-hd ch-get">③ 取的机制</div>
+      <div class="step s1">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <div class="step-title">启动静态加载</div>
+          <div class="step-desc"><code>loadMemoryPrompt()</code><br>读 MEMORY.md 前 200 行 → 注入 system prompt<br>TEAMMEM 时同时注入 private + team 两份</div>
+        </div>
+      </div>
+      <div class="step s2">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <div class="step-title">会话中动态召回</div>
+          <div class="step-desc"><code>findRelevantMemories()</code><br>并发扫 frontmatter 前30行 → Sonnet sideQuery（<strong style="color:#fff">256 token 预算</strong>）<br>最多选 <strong style="color:#fff">5 个</strong>文件 · <code>alreadySurfaced</code> 在召回前过滤已用<br>Sonnet = 旁路轻量调用，独立于主模型</div>
+        </div>
+      </div>
+      <div class="step s3">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <div class="step-title">对话后后台提取</div>
+          <div class="step-desc"><code>extractMemories</code> fork 子代理<br>主代理写了就跳过 · 2 轮写法：先并行 Read → 再并行 Write<br>工具受限：仅 memory 目录 · Bash rm 禁止</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARR 3 -->
+    <div class="arr">
+      <div class="arr-line"></div>
+      <div class="arr-label">整合</div>
+      <div class="arr-head"></div>
+      <div class="arr-line"></div>
+    </div>
+
+    <!-- COL 4: 维护不过期 -->
+    <div class="col">
+      <div class="col-hd ch-keep">④ 维护不过期</div>
+      <div class="mcard dream">
+        <div class="mcard-icon">💤</div>
+        <div class="mcard-title">autoDream（DreamTask）</div>
+        <p>三道门触发（按成本从低到高）：时间 &gt; 24h &nbsp;·&nbsp; 会话 &ge; 5 &nbsp;·&nbsp; 分布式锁防并发<br>KAIROS 模式改为 append-only 日志写法</p>
+        <div class="phase-row">
+          <div class="ph">P1 Orient</div>
+          <div class="ph">P2 Gather</div>
+          <div class="ph">P3 Consolidate</div>
+          <div class="ph">P4 Prune</div>
+        </div>
+      </div>
+      <div class="mcard team">
+        <div class="mcard-icon">👥</div>
+        <div class="mcard-title">团队记忆（TEAMMEM）</div>
+        <p>双目录架构，user 永远 private，project/reference 推荐 team</p>
+        <div class="dir-row">
+          <div class="dir priv">private/<div class="dn">用户独享</div></div>
+          <div class="dir team">team/<div class="dn">跨贡献者共享</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--red);margin-top:6px;font-weight:700">🚫 team 禁存 API key / 凭证</div>
+      </div>
+      <div class="mcard fresh">
+        <div class="mcard-icon">⏱</div>
+        <div class="mcard-title">新鲜度（memoryAge.ts）</div>
+        <div class="fresh-warn">超 1 天附 staleness 警告：<br>"This memory is N days old. Verify before asserting."</div>
+        <div class="verify-list">
+          记忆提到<span>文件路径</span> → 先 check 存在<br>
+          记忆提到<span>函数/flag</span> → 先 grep 验证<br>
+          "记忆说 X 存在" ≠ "X 现在存在"
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PHILOSOPHY -->
+  <div class="philosophy">
+    <div class="phil-quote">"不是让模型<strong>'记住一切'</strong>，是让模型<strong>'记对该记的'</strong>。&nbsp; — 存得准靠四类分类学 · 取得准靠三时机 · 不过期靠蒸馏验证<br><span style="font-size:16px;opacity:0.7">记忆的质量，决定了对话的质量。</span>"</div>
+    <div class="phil-files">ONE PAGE TECH · 一张图讲清楚</div>
+  </div>
+</div>
+
+<script>
+async function doExport(){
+  const btn = document.querySelector('.export-btn');
+  const ot = btn.textContent; btn.textContent='导出中...'; btn.disabled=true;
+  try{
+    const c = await html2canvas(document.getElementById('canvas'),{scale:2,backgroundColor:null,logging:false,useCORS:true});
+    c.toBlob(blob=>{
+      const u=URL.createObjectURL(blob),a=document.createElement('a');
+      a.download='Claude记忆系统全局架构.png'; a.href=u; a.click(); URL.revokeObjectURL(u);
+      btn.textContent='✅ 导出成功';
+      setTimeout(()=>{btn.textContent=ot;btn.disabled=false},2000);
+    });
+  }catch(e){btn.textContent='❌ 失败';setTimeout(()=>{btn.textContent=ot;btn.disabled=false},2000)}
+}
+</script>
+</body>
+</html>

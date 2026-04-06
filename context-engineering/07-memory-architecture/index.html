@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Agent 完整记忆架构设计</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(52,152,219,0.10), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(155,89,182,0.08), transparent 28%),
+        linear-gradient(135deg, #f6f8fb, #eef3f9);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .slide {
+      width: 96vw;
+      max-width: 1400px;
+      height: 92vh;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 22px;
+      border: 1px solid rgba(120,140,160,0.18);
+      box-shadow: 0 18px 50px rgba(31, 45, 61, 0.12);
+      padding: 20px 24px 16px;
+      backdrop-filter: blur(8px);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    /* Common Header */
+    .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; border-bottom: 1px solid #e8eef5; padding-bottom: 10px; }
+    .title-wrap h1 { font-size: 30px; line-height: 1.2; color: #102235; margin-bottom: 6px; letter-spacing: 0.2px; font-weight: bold; }
+    .title-wrap p { font-size: 15px; color: #5d6b7a; }
+    .tag { padding: 8px 14px; border-radius: 999px; background: linear-gradient(135deg, #0f62fe, #4b8dff); color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 8px 20px rgba(15,98,254,0.18); align-self: center; }
+
+    .content {
+      display: grid;
+      grid-template-columns: 1fr 1.8fr;
+      gap: 16px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Left Side: Cards */
+    .left-col {
+      display: grid;
+      grid-template-rows: 1fr 1fr 0.9fr 1.15fr;
+      gap: 10px;
+      padding-right: 4px;
+      min-height: 0;
+    }
+
+    .info-card {
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 6px 16px rgba(16,34,53,0.04);
+      border: 1px solid #edf2f7;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .card-l1 { border-top: 5px solid #3b82f6; }
+    .card-l2 { border-top: 5px solid #8b5cf6; }
+    .card-l3 { border-top: 5px solid #ec4899; }
+    .card-l4 { border-top: 5px solid #10b981; }
+
+    .info-card-header {
+      font-weight: bold;
+      font-size: 13.5px;
+      color: #12263a;
+      margin-bottom: 2px;
+      flex-shrink: 0;
+    }
+
+    .info-card-body {
+      font-size: 12.5px;
+      color: #334155;
+      line-height: 1.4;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .info-card-body ul {
+      padding-left: 18px;
+      margin-top: 4px;
+    }
+    
+    .info-card-body li {
+      margin-bottom: 2px;
+    }
+
+    /* Right Side: Diagram */
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.02);
+      padding: 16px 20px;
+      justify-content: space-between;
+      min-height: 0;
+    }
+
+    .diagram-layer {
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .diagram-layer-title {
+      position: absolute;
+      top: -10px;
+      left: 16px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      border-radius: 999px;
+      height: 20px;
+      line-height: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .layer-1 { background: #eff6ff; border: 1.5px solid #bfdbfe; }
+    .layer-1 .diagram-layer-title { background: #3b82f6; }
+    
+    .layer-2 { background: #f5f3ff; border: 1.5px solid #ddd6fe; }
+    .layer-2 .diagram-layer-title { background: #8b5cf6; }
+    
+    .layer-3 { background: #fdf2f8; border: 1.5px solid #fbcfe8; }
+    .layer-3 .diagram-layer-title { background: #ec4899; }
+    
+    .layer-4 { background: #f0fdf4; border: 1.5px solid #bbf7d0; }
+    .layer-4 .diagram-layer-title { background: #10b981; }
+
+    .layer-content {
+      margin-top: 6px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+    }
+
+    .arrow-down {
+      text-align: center;
+      color: #cbd5e1;
+      font-size: 20px;
+      font-weight: bold;
+      line-height: 1;
+      margin: 4px 0;
+    }
+
+    /* Context Engine Specifics */
+    .ce-box {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #4c1d95;
+    }
+    .ce-box.raw {
+      background: #ede9fe;
+      border: 1px dashed #c4b5fd;
+    }
+    .ce-box.dag {
+      background: #f3e8ff;
+      border: 1px solid #d8b4fe;
+    }
+    .ce-box span {
+      display: block;
+      font-size: 11px;
+      color: #6d28d9;
+      margin-top: 4px;
+      font-weight: normal;
+    }
+
+    /* Memory Engine Specifics */
+    .me-tree {
+      background: #fdf2f8;
+      border: 1px solid #fbcfe8;
+      border-radius: 6px;
+      padding: 10px 12px;
+      width: 100%;
+      font-family: monospace;
+      font-size: 12px;
+      color: #9d174d;
+      line-height: 1.6;
+    }
+    .me-tree .dir { font-weight: bold; color: #be185d; }
+
+    /* Storage Specifics */
+    .st-box {
+      flex: 1;
+      background: #d1fae5;
+      border: 1px solid #6ee7b7;
+      border-radius: 6px;
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 12px;
+      color: #065f46;
+      font-weight: bold;
+      line-height: 1.4;
+    }
+
+    /* Session Core Specifics */
+    .sc-box {
+      width: 100%;
+      text-align: center;
+      padding: 10px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      color: #1e40af;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    /* Bottom Banner */
+    .bottom-banner {
+      background: #fef08a;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: #b45309;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+    .bottom-banner-main {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .bottom-banner span {
+      color: #d97706;
+      opacity: 0.5;
+    }
+    .bottom-banner-sub {
+      font-size: 11px;
+      color: #d97706;
+      font-weight: normal;
+    }
+
+    /* Buttons */
+    .export-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #0f62fe, #4b8dff);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.3);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .export-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(15,98,254,0.4);
+    }
+
+    .export-btn:active { transform: translateY(0); }
+
+    .home-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.95);
+      color: #0f62fe;
+      border: 2px solid #0f62fe;
+      border-radius: 50%;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15,98,254,0.15);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .home-btn:hover {
+      background: #0f62fe;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(15,98,254,0.25);
+    }
+
+    .home-btn:active { transform: translateY(0); }
+
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="home-btn">←</a>
+
+  <div class="slide">
+    <!-- Title Area -->
+    <div class="header">
+      <div class="title-wrap">
+        <h1>AI Agent 完整记忆架构设计</h1>
+        <p>借 OpenClaw ContextEngine 分层，lossless-claw 无损，OpenViking 跨会话，构建独立记忆系统</p>
+      </div>
+      <div class="tag">一页图讲清楚 07</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+      
+      <!-- Left Column: 4 Cards -->
+      <div class="left-col">
+        <!-- Layer 1 -->
+        <div class="info-card card-l1">
+          <div class="info-card-header">1. Session Runtime / Agent Core</div>
+          <div class="info-card-body">
+            <strong>职责：只“调用”不“实现”</strong>
+            <ul>
+              <li>接收用户输入</li>
+              <li>调用 ContextEngine.assemble()</li>
+              <li>调用 MemoryEngine.recall()</li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- Layer 2 -->
+        <div class="info-card card-l2">
+          <div class="info-card-header">2. ContextEngine（会话内无损记忆）</div>
+          <div class="info-card-body">
+            <strong>职责：当前会话的摘要树管理</strong>
+            <ul>
+              <li>两层：Raw Layer（全量存原始消息）</li>
+              <li>DAG Layer（L0→L1→L2→L3 摘要树）</li>
+              <li>对模型只发“摘要 + 锚点”</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Layer 3 -->
+        <div class="info-card card-l3">
+          <div class="info-card-header">3. MemoryEngine（跨会话 / 人员记忆）</div>
+          <div class="info-card-body">
+            <strong>职责：长期记忆的提取、存储、召回</strong>
+            <ul>
+              <li>类似文件系统 /memory/users/.../projects/.../agents/...</li>
+              <li>用“路径粗筛 + 向量精炼”做检索</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Layer 4 -->
+        <div class="info-card card-l4">
+          <div class="info-card-header">4. Storage & Index（底层）</div>
+          <div class="info-card-body">
+            <ul>
+              <li>Raw Message Store</li>
+              <li>DAG Node Store</li>
+              <li>Knowledge Index（向量 + 路径）</li>
+            </ul>
+            <div style="margin-top: 6px; font-size: 12px; color: #475569; padding-top: 6px; border-top: 1px dashed #cbd5e1;">
+              本层“数据底座”是上层共享的底层存储资源，可选择 SQLite、本地文件、向量数据库等不同实现，而不影响上层插件接口。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Diagram -->
+      <div class="right-col">
+        
+        <!-- Layer 1 -->
+        <div class="diagram-layer layer-1">
+          <div class="diagram-layer-title">Layer 1: Session Runtime</div>
+          <div class="layer-content">
+            <div class="sc-box">Agent Runtime & Gateway</div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <!-- Layer 2 -->
+        <div class="diagram-layer layer-2">
+          <div class="diagram-layer-title">Layer 2: ContextEngine</div>
+          <div style="position: absolute; top: -10px; right: 16px; background: #fff; padding: 0 8px; height: 20px; line-height: 20px;">
+            <span style="color:#6b7280; font-size:12px;">“无损 = 全量存 + 摘要发”</span>
+          </div>
+          <div class="layer-content">
+            <div class="ce-box raw">
+              Raw Layer
+              <span style="color:#6b21a8; font-size:11px; font-weight:bold; margin-top:6px;">📦 存（全量存）</span>
+            </div>
+            <div class="ce-box dag">
+              DAG Layer
+              <span style="color:#9d174d; font-size:11px; font-weight:bold; margin-top:6px;">📤 发（摘要发）</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <!-- Layer 3 -->
+        <div class="diagram-layer layer-3">
+          <div class="diagram-layer-title">Layer 3: MemoryEngine</div>
+          <div class="layer-content">
+            <div class="me-tree">
+              <span class="dir">/memory</span><br>
+              &nbsp;├── <span class="dir">users</span>/&lt;userId&gt;/preferences<br>
+              &nbsp;├── <span class="dir">projects</span>/&lt;projectId&gt;/architecture<br>
+              &nbsp;└── <span class="dir">agents</span>/&lt;agentId&gt;/experience
+            </div>
+          </div>
+        </div>
+
+        <div class="arrow-down">↓</div>
+
+        <!-- Layer 4 -->
+        <div class="diagram-layer layer-4">
+          <div class="diagram-layer-title">Layer 4: Storage & Index</div>
+          <div class="layer-content">
+            <div class="st-box">Raw Message Store</div>
+            <div class="st-box">DAG Node Store</div>
+            <div class="st-box">Knowledge Index<br>(向量 + 路径)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Bottom Banner -->
+    <div class="bottom-banner">
+      <div class="bottom-banner-main">
+        3 个核心设计思路：
+        <span>|</span>
+        插件化隔离
+        <span>|</span>
+        无损 = 全量存 + 摘要发
+        <span>|</span>
+        分层目录式长期记忆
+      </div>
+      <div class="bottom-banner-sub">
+        * 本页架构与 OpenClaw / Claude Code / Agent 平台的官方记忆系统同源，上层是自研插件实现，底层共享通用存储底座。
+      </div>
+    </div>
+  </div>
+
+  <button class="export-btn" onclick="exportAsImage()">📸 导出为图片</button>
+
+  <script>
+    async function exportAsImage() {
+      const button = document.querySelector('.export-btn');
+      button.textContent = '生成中...';
+      button.disabled = true;
+
+      try {
+        const slideElement = document.querySelector('.slide');
+        const canvas = await html2canvas(slideElement, {
+          scale: 2,
+          backgroundColor: null,
+          logging: false,
+          useCORS: true
+        });
+
+        const link = document.createElement('a');
+        link.download = 'AI-Agent-记忆架构设计.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        button.textContent = '✅ 导出成功';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      } catch (error) {
+        console.error('导出失败:', error);
+        button.textContent = '❌ 导出失败';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      }
+    }
+  </script>
+</body>
+</html>

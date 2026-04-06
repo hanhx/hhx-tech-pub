@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Harness Engineering 深度拆解</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#1a1a2e;--bg2:#16213e;--bg3:#0f3460;
+  --accent:#e94560;--accent2:#00d2ff;--green:#22c55e;--orange:#f59e0b;
+  --text:#f0f0f0;--text-dim:#8892b0;
+  --card-bg:rgba(255,255,255,0.05);--card-border:rgba(255,255,255,0.08);
+}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;-webkit-overflow-scrolling:touch}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:radial-gradient(circle at 50% 0%,#1a1f3c 0%,var(--bg1) 100%);color:var(--text);line-height:1.8;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:linear-gradient(rgba(0,210,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,210,255,0.03) 1px,transparent 1px);background-size:40px 40px;z-index:-2;pointer-events:none}
+#progress{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));z-index:1000;transition:width .25s;width:0}
+.s{min-height:100vh;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;padding:60px 24px;position:relative}
+.s .inner{max-width:960px;width:100%;opacity:0;transform:translateY(40px);transition:opacity .7s,transform .7s}
+.s.visible .inner{opacity:1;transform:translateY(0)}
+h1{font-size:clamp(40px,7vw,72px);font-weight:900;line-height:1.2;margin-bottom:20px;background:linear-gradient(135deg,#fff 20%,var(--accent2) 80%,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(0,210,255,0.3))}
+h2{font-size:clamp(28px,5vw,48px);font-weight:800;margin-bottom:16px;color:var(--text)}
+.hl{color:var(--accent);-webkit-text-fill-color:var(--accent)}
+.lead{font-size:clamp(16px,2.5vw,22px);color:var(--text-dim);margin-bottom:40px;line-height:1.6}
+.cards{display:grid;gap:20px}
+.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:28px;transition:transform .3s,box-shadow .3s}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgba(0,0,0,0.3)}
+.card h3{font-size:20px;margin-bottom:8px;color:var(--text)}
+.card p{font-size:15px;color:var(--text-dim);line-height:1.7}
+.card-icon{font-size:36px;margin-bottom:12px}
+.big-num{font-size:clamp(60px,12vw,96px);font-weight:900;font-family:'Arial Black',Arial,sans-serif;color:var(--text);line-height:1;letter-spacing:4px}
+.badge{display:inline-block;background:var(--accent);padding:10px 30px;border-radius:8px;font-size:clamp(24px,4vw,36px);font-weight:bold;color:#fff;margin-top:30px}
+.quote-box{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:50px;text-align:center;position:relative;overflow:hidden}
+.ghost{font-size:120px;opacity:0.05;position:absolute;top:-20px;right:20px;pointer-events:none}
+.cta{display:inline-block;border:2px dashed var(--accent);padding:20px 40px;border-radius:12px;font-size:24px;font-weight:bold;color:var(--accent)}
+.gradient-text{font-size:clamp(24px,4vw,36px);font-weight:bold;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+@media(max-width:700px){.cards{grid-template-columns:1fr!important}.card{padding:20px}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<!-- Section 1: 震撼开场 -->
+<div class="s" id="s1">
+  <div class="inner" style="text-align:center">
+    <h1>Harness<br>Engineering</h1>
+    <div class="lead">Leveraging Codex in an Agent-First World<br><span style="font-size:0.8em;opacity:0.7">OpenAI 内部激进实验：人类一行代码都不写</span></div>
+    <div class="big-num">1,000,000</div>
+    <div style="font-size:24px;color:var(--text-dim);font-weight:bold;margin-top:10px">行代码</div>
+    <div class="badge">人类手写 0 行</div>
+    <p style="margin-top:20px;font-size:18px;color:var(--text-dim)">3 个工程师 · 5 个月 · 1500 个 PR · 完全由 AI 驱动</p>
+  </div>
+</div>
+
+<!-- Section 2: 范式三级跳 -->
+<div class="s" id="s2">
+  <div class="inner">
+    <h2>研发范式的<span class="hl">三级跳</span></h2>
+    <div class="lead">从凭感觉指挥，到全栈自治</div>
+    <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <h3>1. Vibe Coding</h3>
+        <p>凭感觉让 AI 写代码。产出快、很爽，但缺乏架构约束，产生大量一次性、难维护的代码。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📘</div>
+        <h3>2. SDD 规范驱动</h3>
+        <p>人写详细的规范文档，AI 按规范生成代码。人是架构师，AI 是施工队。</p>
+      </div>
+      <div class="card" style="border-color:var(--accent);box-shadow:0 0 20px rgba(233,69,96,0.2)">
+        <div class="card-icon" style="color:var(--accent)">🤖</div>
+        <h3 style="color:var(--accent)">3. Harness Engineering</h3>
+        <p>人连规范都不写。只负责搭环境、定约束、维护结构化知识，让 AI <b>全权自治</b>运行。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: 3个颠覆细节 -->
+<div class="s" id="s3">
+  <div class="inner">
+    <h2>OpenAI 内部的<span class="hl"> 3 个颠覆细节</span></h2>
+    <div class="lead">当 AI 成为自治开发者</div>
+    <div class="cards">
+      <div class="card" style="display:flex;align-items:center;gap:20px;padding:25px">
+        <div style="font-size:48px">👀</div>
+        <div>
+          <h3>AI 互相对话 Review</h3>
+          <p>人类不再必须参与 Code Review。审查、反馈、迭代全部由 Agent 互相拉扯完成。原文："we've pushed almost all review effort towards agent-to-agent"。</p>
+        </div>
+      </div>
+      <div class="card" style="display:flex;align-items:center;gap:20px;padding:25px">
+        <div style="font-size:48px">🌱</div>
+        <div>
+          <h3>自动化"文档园丁"</h3>
+          <p>不在仓库里的知识 = 不存在。后台定期运行 AI 扫描陈旧文档，自动提 PR 修复过期内容。文档从附属品变成了基础设施。</p>
+        </div>
+      </div>
+      <div class="card" style="display:flex;align-items:center;gap:20px;padding:25px">
+        <div style="font-size:48px">🌙</div>
+        <div>
+          <h3>夜间连续暴走 6 小时</h3>
+          <p>单次 Codex 运行可连续专注工作长达 6 小时以上。原文："often while the humans are sleeping"。你睡觉的时候，AI 在帮你加班。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 4: 什么是 Harness -->
+<div class="s" id="s4">
+  <div class="inner">
+    <h2>什么是<span class="hl"> Harness</span>？</h2>
+    <div class="lead">软件开发仍需纪律，但纪律体现在脚手架上</div>
+    <div class="quote-box">
+      <div class="ghost">🐎</div>
+      <h3 style="font-size:36px;color:var(--accent2);margin-bottom:20px">Harness = 马具（缰绳、马鞍）</h3>
+      <p style="font-size:22px;line-height:1.8">AI 就像一匹狂奔的野马。跑得极快，但容易跑偏。</p>
+      <div style="margin-top:30px;font-size:26px;font-weight:bold;line-height:1.8;color:var(--accent)">
+        工程师的价值不再是代替马奔跑，<br>而是打造完美的马具。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 5: 终局 -->
+<div class="s" id="s5">
+  <div class="inner" style="text-align:center">
+    <h2>工程师的<span class="hl">终局</span></h2>
+    <p style="font-size:24px;color:var(--text-dim);margin-bottom:50px">从写代码，到写规范，到连规范都不写</p>
+    <div class="gradient-text" style="margin-bottom:50px">核心能力已变成：驾驭 AI 自治运行</div>
+    <div class="cta">
+      评论区扣【原文】<br>
+      <span style="font-size:16px;color:var(--text);font-weight:normal">获取 OpenAI 原文翻译及深度解析</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const sections = document.querySelectorAll('.s');
+  const progress = document.getElementById('progress');
+  let current = 0;
+  const total = sections.length;
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        current = Array.from(sections).indexOf(e.target);
+        progress.style.width = ((current + 1) / total * 100) + '%';
+      }
+    });
+  }, { threshold: 0.15 });
+  sections.forEach(s => io.observe(s));
+
+  // Keyboard nav
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); goTo(current + 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); goTo(current - 1); }
+  });
+
+  // Detect mobile
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // Wheel nav (desktop only, throttled)
+  if (!isMobile) {
+    let wheelLock = false;
+    window.addEventListener('wheel', e => {
+      if (wheelLock) return;
+      wheelLock = true;
+      if (e.deltaY > 30) goTo(current + 1);
+      else if (e.deltaY < -30) goTo(current - 1);
+      setTimeout(() => wheelLock = false, 800);
+    }, { passive: true });
+  }
+
+  // Touch nav (mobile: let native scroll-snap handle it, only assist on desktop touch)
+  if (!isMobile) {
+    let touchY = 0;
+    window.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+    window.addEventListener('touchend', e => {
+      const dy = touchY - e.changedTouches[0].clientY;
+      if (Math.abs(dy) > 60) dy > 0 ? goTo(current + 1) : goTo(current - 1);
+    }, { passive: true });
+  }
+
+  function goTo(idx) {
+    if (idx >= 0 && idx < total) sections[idx].scrollIntoView({ behavior: 'smooth' });
+  }
+})();
+</script>
+</body>
+</html>

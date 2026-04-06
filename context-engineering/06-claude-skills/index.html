@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一张图讲透 Claude Code 的 Skills 渐进披露黑科技</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(52,152,219,0.10), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(155,89,182,0.08), transparent 28%),
+        linear-gradient(135deg, #f6f8fb, #eef3f9);
+      color: #1f2d3d;
+      height: 100vh;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+
+    .slide {
+      width: 96vw;
+      max-width: 1400px;
+      height: 92vh;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(120,140,160,0.18);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(31,45,61,0.12);
+      padding: 20px 24px 16px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 12px;
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      border-bottom: 1px solid #e8eef5;
+      padding-bottom: 10px;
+    }
+
+    .title-wrap h1 {
+      font-size: 28px;
+      line-height: 1.2;
+      color: #102235;
+      margin-bottom: 5px;
+      letter-spacing: 0.2px;
+    }
+
+    .title-wrap h1 span { color: #0f62fe; }
+
+    .title-wrap p {
+      font-size: 14px;
+      color: #5d6b7a;
+      line-height: 1.45;
+    }
+
+    .tag-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .tag {
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #0f62fe, #4b8dff);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.18);
+    }
+
+    .disclaimer {
+      font-size: 11px;
+      color: #64748b;
+      text-align: right;
+      line-height: 1.35;
+      font-style: italic;
+    }
+
+    .summary {
+      background: linear-gradient(135deg,#103a5c,#155b8b);
+      color: #fff;
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .summary .label {
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.95;
+      letter-spacing: 0.5px;
+    }
+
+    .summary .text {
+      font-size: 20px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .summary .text .highlight { color: #fef08a; }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr 1fr;
+      gap: 14px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 14px 16px 12px;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.06);
+      border: 1px solid #edf2f7;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .card.left { border-top: 4px solid #7c3aed; }
+    .card.center { border-top: 4px solid #0f62fe; }
+    .card.right { border-top: 4px solid #f59e0b; }
+
+    .card h2 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #12263a;
+    }
+
+    .card .subtitle {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.45;
+      margin-bottom: 10px;
+    }
+
+    .card ul {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #334155;
+    }
+
+    .card li strong { color: #0f172a; }
+
+    .memory-stack {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .memory-box {
+      border-radius: 12px;
+      padding: 10px 12px;
+      border: 1px solid #e9d5ff;
+      background: #faf5ff;
+    }
+
+    .memory-box.primary {
+      border-color: #fca5a5;
+      background: #fef2f2;
+    }
+
+    .memory-box.primary .memory-title { color: #b91c1c; }
+
+    .memory-box.secondary {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .memory-box.secondary .memory-title { color: #1d4ed8; }
+
+    .memory-box.tertiary {
+      border-color: #86efac;
+      background: #f0fdf4;
+    }
+
+    .memory-box.tertiary .memory-title { color: #15803d; }
+
+    .memory-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #5b21b6;
+      margin-bottom: 4px;
+    }
+
+    .memory-desc {
+      font-size: 11px;
+      color: #5b5563;
+      line-height: 1.45;
+    }
+
+    /* ── Center card: flow steps ── */
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .flow-node {
+      border-radius: 12px;
+      padding: 9px 11px;
+      border: 1px solid #dbeafe;
+      background: #f8fbff;
+      box-shadow: 0 4px 14px rgba(15,98,254,0.05);
+    }
+
+    .flow-node .node-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .flow-node .node-desc {
+      font-size: 11px;
+      line-height: 1.4;
+      color: #475569;
+    }
+
+    .flow-node .token-badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 6px;
+      margin-left: 4px;
+    }
+
+    .flow-node.scan { background: linear-gradient(135deg, #eff6ff, #e0e7ff); border-color: #6366f1; border-width: 2px; }
+    .flow-node.match { background: linear-gradient(135deg, #f0fdf4, #f7fee7); border-color: #86efac; }
+    .flow-node.inject { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fbbf24; }
+    .flow-node.recycle { background: linear-gradient(135deg, #f0fdf4, #ecfdf5); border-color: #34d399; }
+
+    .flow-vline {
+      text-align: center;
+      font-size: 14px;
+      color: #b0bec5;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .flow-branch {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .branch-or {
+      font-size: 11px;
+      font-weight: 800;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    .flow-modes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .mode-box {
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .mode-box.inline {
+      background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+      border: 1px solid #86efac;
+      color: #065f46;
+    }
+
+    .mode-box.fork {
+      background: linear-gradient(135deg, #f5f3ff, #eef2ff);
+      border: 1px solid #c4b5fd;
+      color: #5b21b6;
+    }
+
+    .mode-box strong {
+      display: block;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+
+    /* ── Right card: agent loop ── */
+    .agent-stack {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .agent-box {
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .agent-box.phase1 {
+      border: 1px solid #fde68a;
+      background: #fffbeb;
+    }
+
+    .agent-box.phase2 {
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+    }
+
+    .agent-box.phase3 {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .agent-box .ab-title {
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .agent-box.phase1 .ab-title { color: #92400e; }
+    .agent-box.phase2 .ab-title { color: #1d4ed8; }
+    .agent-box.phase3 .ab-title { color: #475569; }
+
+    .agent-box .ab-desc {
+      font-size: 11px;
+      color: #5b5563;
+      line-height: 1.45;
+    }
+
+    .pill-row {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      color: #475569;
+      white-space: nowrap;
+    }
+
+    .pill.blue { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .pill.orange { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+
+    /* ── Bottom section ── */
+    .bottom-section {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .compare-bar {
+      background: linear-gradient(to right, #f8fafc, #f1f5f9);
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #64748b;
+      border-radius: 14px;
+      padding: 10px 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .compare-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #b45309;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .compare-item {
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #334155;
+    }
+
+    .compare-item strong {
+      display: block;
+      color: #0f172a;
+      margin-bottom: 3px;
+      font-size: 12px;
+    }
+
+    .compare-item.highlight {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+
+    .takeaway {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid #edf2f7;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.05);
+      padding: 10px 12px;
+    }
+
+    .takeaway h3 {
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #12263a;
+      font-weight: 700;
+    }
+
+    .takeaway .quote {
+      font-size: 15px;
+      line-height: 1.45;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .takeaway .note {
+      font-size: 12px;
+      color: #5b6b7c;
+      line-height: 1.45;
+    }
+
+    .export-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg,#0f62fe,#4b8dff);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.3);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .export-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(15,98,254,0.4);
+    }
+
+    .export-btn:active { transform: translateY(0); }
+
+    .home-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.95);
+      color: #0f62fe;
+      border: 2px solid #0f62fe;
+      border-radius: 50%;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15,98,254,0.15);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .home-btn:hover {
+      background: #0f62fe;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(15,98,254,0.25);
+    }
+
+    .home-btn:active { transform: translateY(0); }
+
+    @media (max-width: 1180px) {
+      .slide {
+        height: auto;
+        min-height: 92vh;
+        overflow: auto;
+      }
+      .main, .bottom-section { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: 1fr; }
+      .compare-grid { grid-template-columns: 1fr; }
+      .flow-modes { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="home-btn">←</a>
+
+  <div class="slide">
+    <div class="header">
+      <div class="title-wrap">
+        <h1>一张图讲透 Claude Code 的 <span>Skills</span> 渐进披露黑科技</h1>
+        <p>一张图揭秘 ：Skills 颠覆MCP，让Agent从精英工具变全民技能</p>
+      </div>
+      <div class="tag-wrap">
+        <div class="tag">一页图讲清楚 06</div>
+        <div class="disclaimer">基于公开资料与工程抽象示意，不脑补未公开的实现细节</div>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="label">🎯 顶层结论</div>
+      <div class="text">
+        Memory Files 渐进披露 → <span class="highlight">Skills YAML 标准化</span>　Main Agent 调度 0 改动，<span class="highlight">披露机制产品化升级</span>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- Left -->
+      <section class="card left">
+        <h2>① 披露机制演进：Memory Files → Skills</h2>
+        <div class="subtitle">从每项目手工造轮子 → 标准化可复用引擎</div>
+        
+        <div class="memory-stack">
+          <div class="memory-box primary">
+            <div class="memory-title">Memory Files 痛点</div>
+            <div class="memory-desc">每项目手动写 200 行索引，维护成本高，tool call 路径硬编码，重复劳动</div>
+          </div>
+          <div class="memory-box secondary">
+            <div class="memory-title">Skills 标准化解法</div>
+            <div class="memory-desc">YAML frontmatter 声明即用，自动扫描匹配，执行后零污染回收，开箱即用</div>
+          </div>
+          <div class="memory-box tertiary">
+            <div class="memory-title">演进价值</div>
+            <div class="memory-desc">1 个 Skills 全项目复用，省时 80%，生态共享取代手工重复造轮子</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center -->
+      <section class="card center">
+        <h2>② Skills 4 步闭环（Main Agent 调度逻辑不变）</h2>
+        <div class="subtitle">扫描 YAML frontmatter → 匹配任务 → 注入正文 → 执行回收，Main Agent 全程主导</div>
+
+        <div class="flow-steps">
+          <div class="flow-node scan">
+            <div class="node-title">🔍 ① 启动扫描 <span class="token-badge">~100 token</span></div>
+            <div class="node-desc">只读 YAML frontmatter：技能名称、描述、触发条件</div>
+          </div>
+          <div class="flow-vline">↓</div>
+          <div class="flow-node match">
+            <div class="node-title">🎯 ② 匹配任务</div>
+            <div class="node-desc">Main Agent 根据用户任务，自动匹配最相关的 Skill</div>
+          </div>
+          <div class="flow-vline">↓ 注入正文 <span style="font-size:10px;color:#92400e;background:#fef3c7;padding:1px 5px;border-radius:4px;">~5k token</span></div>
+          <div class="flow-branch">
+            <div class="mode-box inline">
+              <strong>⚡ 内联执行</strong>
+              简单技能 → Main Agent 内直接执行
+            </div>
+            <div class="branch-or">或</div>
+            <div class="mode-box fork">
+              <strong>🔀 Fork 隔离</strong>
+              复杂技能 → Sub-Agent 独立上下文
+            </div>
+          </div>
+          <div class="flow-vline">↓ 结果汇合</div>
+          <div class="flow-node recycle">
+            <div class="node-title">♻️ ④ 执行回收 <span class="token-badge">~200 token</span></div>
+            <div class="node-desc">自动剥离正文，只留结果摘要，上下文零污染</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right -->
+      <section class="card right">
+        <h2>③ 动态化带来的工程收益</h2>
+        <div class="subtitle">从静态到动态，Main Agent 调度不变，但工程价值大幅提升</div>
+
+        <div class="agent-stack">
+          <div class="agent-box phase1">
+            <div class="ab-title">零污染上下文</div>
+            <div class="ab-desc">100t（frontmatter）→ 5kt（正文）→ 200t（摘要），用完即收，上下文始终干净</div>
+          </div>
+          <div class="agent-box phase2">
+            <div class="ab-title">零部署零配置</div>
+            <div class="ab-desc">YAML 即声明，.md 即执行说明。放进 skills/ 目录就能用，不像 MCP 需部署服务</div>
+          </div>
+          <div class="agent-box phase3">
+            <div class="ab-title">静态 + 动态互补</div>
+            <div class="ab-desc">Memory Files 做目录（"有什么"），Skills 做执行（"怎么用"），缺一不可</div>
+          </div>
+        </div>
+
+        <div class="pill-row">
+          <span class="pill blue">100t → 5kt → 200t</span>
+          <span class="pill orange">零污染回收</span>
+          <span class="pill">静态 + 动态互补</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="bottom-section">
+      <div class="compare-bar">
+        <div class="compare-title">💡 Skills vs Memory Files vs MCP</div>
+        <div class="compare-grid">
+          <div class="compare-item">
+            <strong>Memory Files</strong>
+            静态规则目录：告诉 Claude"项目里有什么"。启动时加载，不执行。
+          </div>
+          <div class="compare-item highlight">
+            <strong>Skills</strong>
+            动态执行模块：教 Claude"怎么用技能"。按需加载，零部署，零污染。
+          </div>
+          <div class="compare-item">
+            <strong>MCP</strong>
+            外部接口标准：只是通路，部署复杂。2026 趋势：MCP 做基础设施，Skills 做标准接口。
+          </div>
+        </div>
+      </div>
+
+      <div class="takeaway">
+        <h3>🎯 一句话带走</h3>
+        <div class="quote">
+          Skills用渐进披露实现标准化执行，Memory Files原型 → Skills产品化
+        </div>
+        <div class="note">
+          Main Agent调度0改动，工程效率10倍提升，引爆社区生态。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="export-btn" onclick="exportAsImage()">📸 导出为图片</button>
+
+  <script>
+    async function exportAsImage() {
+      const button = document.querySelector('.export-btn');
+      button.textContent = '生成中...';
+      button.disabled = true;
+
+      try {
+        const slideElement = document.querySelector('.slide');
+        const canvas = await html2canvas(slideElement, {
+          scale: 2,
+          backgroundColor: null,
+          logging: false,
+          useCORS: true
+        });
+
+        const link = document.createElement('a');
+        link.download = 'Claude-Skills-MemoryFiles演进.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        button.textContent = '✅ 导出成功';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      } catch (error) {
+        console.error('导出失败:', error);
+        button.textContent = '❌ 导出失败';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      }
+    }
+  </script>
+</body>
+</html>

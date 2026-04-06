@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Effective Harnesses for Long-Running Agents - Anthropic</title>
+<meta name="description" content="Anthropic《Effective harnesses for long-running agents》解读：长任务 agent 成功的关键在于 harness 设计，而非单纯模型能力。"/>
+<meta name="theme-color" content="#1a1a2e"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#0f172a;--bg2:#1e293b;--bg3:#334155;
+  --accent:#38bdf8;--accent2:#818cf8;--green:#34d399;--orange:#fbbf24;--red:#fb7185;
+  --text:#f8fafc;--text-dim:#94a3b8;--code-bg:#0d1117;
+  --card-bg:rgba(255,255,255,0.03);--card-border:rgba(255,255,255,0.08);
+  --transition:0.4s cubic-bezier(.25,.8,.25,1)
+}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:var(--accent) var(--bg1)}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg1) 100%);color:var(--text);line-height:1.8;overflow-x:hidden;letter-spacing:0.02em;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body::before{content:'';position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:linear-gradient(rgba(56,189,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.03) 1px,transparent 1px);background-size:40px 40px;z-index:-2;pointer-events:none}
+body::after{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%, rgba(129,140,248,0.08), transparent 30%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.06), transparent 25%);z-index:-1;pointer-events:none;animation:bgPulse 20s ease-in-out infinite alternate}
+@keyframes bgPulse {
+  0%, 100% { filter: drop-shadow(0 0 15px rgba(56,189,248,0.2)); }
+  50% { filter: drop-shadow(0 0 30px rgba(56,189,248,0.5)); }
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
+
+/* ── 加载进度条 ── */
+#progress{position:fixed;top:0;right:0;width:4px;height:0;background:linear-gradient(180deg,var(--accent),var(--accent2));z-index:1000;transition:height .25s;border-radius:0 0 0 4px}
+
+/* ── 侧边导航 ── */
+#nav{position:fixed;top:0;left:0;width:260px;height:100vh;background:rgba(15,23,42,.94);backdrop-filter:blur(14px);border-right:1px solid var(--card-border);z-index:900;transform:translateX(-100%);transition:transform var(--transition);overflow-y:auto;padding:56px 0 20px;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
+#nav.open{transform:translateX(0)}
+#nav a{display:block;padding:7px 18px;color:var(--text-dim);font-size:13px;text-decoration:none;border-left:3px solid transparent;transition:all .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#nav a:hover,#nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(56,189,248,.06)}
+#nav a .num{display:inline-block;width:22px;color:var(--accent2);font-weight:700;font-size:11px}
+#menu-btn{position:fixed;top:14px;left:14px;z-index:950;width:40px;height:40px;border:none;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text);font-size:20px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+#menu-btn:hover{background:var(--accent)}
+
+/* ── 页面控制 ── */
+#page-num{position:fixed;left:18px;bottom:18px;z-index:920;padding:8px 12px;border-radius:10px;border:1px solid var(--card-border);background:rgba(15,23,42,.72);backdrop-filter:blur(8px);font-size:13px;line-height:1;color:var(--text-dim);letter-spacing:.06em}
+.page-ctrl{position:fixed;right:18px;bottom:18px;z-index:920;display:flex;flex-direction:column;gap:8px}
+.page-ctrl button,#to-top{width:38px;height:38px;border:none;border-radius:10px;cursor:pointer;background:rgba(15,23,42,.72);color:var(--text);border:1px solid var(--card-border);backdrop-filter:blur(8px);transition:transform .2s,background .2s,border-color .2s}
+.page-ctrl button:hover,#to-top:hover{transform:translateY(-1px);background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.45)}
+#to-top{position:fixed;right:18px;bottom:110px;z-index:920;opacity:0;visibility:hidden;pointer-events:none}
+#to-top.show{opacity:1;visibility:visible;pointer-events:auto}
+
+/* ── 引用块 ── */
+.quote{border-left:4px solid var(--accent);background:linear-gradient(90deg,rgba(56,189,248,.08),transparent);padding:24px 28px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+
+/* ── Section ── */
+.s{min-height:100vh;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;padding:80px 6vw;position:relative}
+.s .inner{max-width:1600px;width:100%;opacity:0;transform:translateY(40px);transition:opacity .7s,transform .7s}
+.s.visible .inner{opacity:1;transform:translateY(0)}
+
+/* ── 排版 ── */
+.s h1{font-size:clamp(64px,8vw,96px);font-weight:900;line-height:1.2;margin-bottom:32px;background:linear-gradient(135deg,#fff 20%,var(--accent) 80%,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.02em;filter:drop-shadow(0 0 20px rgba(56,189,248,0.3));animation:titleShine 4s linear infinite}
+@keyframes titleShine {
+  0%, 100% { filter: drop-shadow(0 0 15px rgba(56,189,248,0.2)); }
+  50% { filter: drop-shadow(0 0 30px rgba(56,189,248,0.5)); }
+}
+.s h2{font-size:clamp(44px,6vw,64px);font-weight:700;margin-bottom:32px;color:#fff;letter-spacing:-0.01em}
+.s h3{font-size:clamp(32px,4vw,48px);font-weight:600;margin-bottom:24px;color:var(--accent)}
+.s p,.s li{color:var(--text-dim);margin-bottom:16px;line-height:1.7;font-size:clamp(20px,2vw,26px)}
+.sub{font-size:clamp(28px,3vw,40px);color:var(--text-dim);margin-bottom:40px}
+.divider{width:60px;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;margin:16px 0}
+.tag{display:inline-block;padding:10px 24px;border-radius:8px;font-size:20px;font-weight:700;background:rgba(56,189,248,.1);color:var(--accent);margin:8px;border:1px solid rgba(56,189,248,.3);text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 10px rgba(56,189,248,.2)}
+
+/* ── Skill 绿色高亮 ── */
+.sk{color:var(--green);font-weight:700}
+
+/* ── 卡片网格 ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:32px;margin-top:32px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px;transition:all .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 16px rgba(0,0,0,0.2);position:relative;overflow:hidden;backdrop-filter:blur(10px)}
+.card::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);transform:skewX(-20deg);transition:0.5s}
+.card:hover{transform:translateY(-6px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.1), 0 12px 32px rgba(56,189,248,0.15);border-color:rgba(56,189,248,0.4)}
+.card:hover::after{left:150%}
+.card .icon{font-size:68px;margin-bottom:28px;filter:drop-shadow(0 0 8px rgba(255,255,255,0.2))}
+.card h4{font-size:34px;color:#fff;margin-bottom:16px}
+.card p{font-size:22px;color:var(--text-dim);line-height:1.6}
+
+/* ── 资产卡片 (s5) ── */
+.asset-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:32px}
+.asset-card{border-radius:16px;padding:28px 22px 24px;background:linear-gradient(180deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.1);border-top:4px solid;position:relative;overflow:hidden;backdrop-filter:blur(10px);transition:transform .3s,box-shadow .3s}
+.asset-card:hover{transform:translateY(-5px);box-shadow:0 14px 36px rgba(0,0,0,0.32)}
+.ac1{border-top-color:var(--accent)}.ac2{border-top-color:var(--accent2)}.ac3{border-top-color:var(--green)}.ac4{border-top-color:var(--orange)}
+.ac-ghost{position:absolute;top:8px;right:14px;font-size:56px;font-weight:900;line-height:1;opacity:0.07;pointer-events:none}
+.ac1 .ac-ghost{color:var(--accent)}.ac2 .ac-ghost{color:var(--accent2)}.ac3 .ac-ghost{color:var(--green)}.ac4 .ac-ghost{color:var(--orange)}
+.ac-icon-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}.ac-icon{font-size:36px;line-height:1}
+.ac-badge{font-size:14px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.ac1 .ac-badge{color:var(--accent)}.ac2 .ac-badge{color:var(--accent2)}.ac3 .ac-badge{color:var(--green)}.ac4 .ac-badge{color:var(--orange)}
+.ac-name{font-family:ui-monospace,"Fira Code","JetBrains Mono",monospace;font-size:22px;font-weight:700;color:#fff;margin-bottom:10px;line-height:1.3}
+.ac-desc{font-size:16px;color:var(--text-dim);line-height:1.5;margin:0}
+.flow-loop{margin-top:16px;padding:0 4px}.flow-loop svg{width:100%;height:36px;display:block}
+.ac-warn{font-size:11px;margin-top:10px;padding:6px 10px;border-radius:6px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.28);color:#fde68a;line-height:1.5}
+.startup-seq{margin:20px 0 8px;padding:16px 22px;background:rgba(56,189,248,0.05);border:1px solid rgba(56,189,248,0.15);border-radius:14px}
+.ss-head{font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:10px;opacity:0.8}
+.ss-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ss-item{font-size:13px;color:var(--text-dim);padding:5px 12px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);white-space:nowrap}
+.ss-item code{color:var(--accent);font-family:ui-monospace,monospace;font-size:12px}
+.ss-sep{color:var(--accent);opacity:0.35;font-size:14px;flex-shrink:0}
+.fw-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:32px}
+.fw-card{border-radius:16px;padding:28px 28px 24px;background:linear-gradient(180deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.1);border-left:4px solid var(--accent2)}
+.fw-card h4{font-size:20px;font-weight:700;color:#fff;margin-bottom:10px}
+.fw-card p{font-size:15px;color:var(--text-dim);line-height:1.6;margin:0}
+@media(max-width:768px){.fw-grid{grid-template-columns:1fr}}
+.flow-en{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.55;margin-top:4px;line-height:1}
+.flow-step.s1 .flow-en{color:var(--accent)}.flow-step.s2 .flow-en{color:var(--accent2)}.flow-step.s3 .flow-en{color:var(--green)}.flow-step.s4 .flow-en{color:var(--orange)}.flow-step.s5 .flow-en{color:var(--red)}
+@media(max-width:768px){.asset-grid{grid-template-columns:1fr 1fr}}
+
+/* ── Flow（左→右流程） ── */
+.flow-row{display:flex;align-items:stretch;justify-content:center;gap:14px;margin-top:40px;overflow-x:auto;padding-bottom:10px}
+.flow-step{min-width:160px;max-width:320px;flex:1;background:linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);border:1px solid rgba(255,255,255,0.12);border-top:5px solid var(--accent);border-radius:18px;padding:24px 22px 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 26px rgba(0,0,0,0.26);backdrop-filter:blur(10px)}
+.flow-step.s1{border-top-color:var(--accent)}
+.flow-step.s2{border-top-color:var(--accent2)}
+.flow-step.s3{border-top-color:var(--green)}
+.flow-step.s4{border-top-color:var(--orange)}
+.flow-step.s5{border-top-color:var(--red)}
+.flow-step .n{font-size:34px;font-weight:900;line-height:1;margin-bottom:10px}
+.flow-step.s1 .n{color:var(--accent)}
+.flow-step.s2 .n{color:var(--accent2)}
+.flow-step.s3 .n{color:var(--green)}
+.flow-step.s4 .n{color:var(--orange)}
+.flow-step.s5 .n{color:var(--red)}
+.flow-step h4{font-size:24px;margin-bottom:10px;color:#fff}
+.flow-step p{font-size:16px;line-height:1.5;margin:0;color:var(--text-dim)}
+.flow-link{position:relative;min-width:36px;flex:0 0 36px;align-self:center;height:2px;background:linear-gradient(90deg,rgba(56,189,248,.35),rgba(56,189,248,.9));box-shadow:0 0 10px rgba(56,189,248,.45),0 0 24px rgba(129,140,248,.28)}
+.flow-link::after{content:'';position:absolute;right:-2px;top:50%;width:12px;height:12px;border-top:3px solid #7dd3fc;border-right:3px solid #7dd3fc;transform:translateY(-50%) rotate(45deg);filter:drop-shadow(0 0 6px rgba(56,189,248,.55))}
+
+/* ── Before→After 对比 ── */
+.ba-compare{display:grid;grid-template-columns:1fr 80px 1fr;gap:20px;align-items:center;margin:20px 0}
+.ba-box{background:var(--card-bg);border:1px solid var(--card-border);border-radius:18px;padding:28px;height:100%}
+.ba-box.before{border-color:rgba(251,113,133,.3);background:linear-gradient(180deg, rgba(251,113,133,0.05) 0%, transparent 100%)}
+.ba-box.after{border-color:rgba(52,211,153,.3);background:linear-gradient(180deg, rgba(52,211,153,0.05) 0%, transparent 100%)}
+.ba-box h4{font-size:28px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-weight:700}
+.ba-box ul{list-style:none;padding:0}
+.ba-box li{font-size:18px;color:var(--text-dim);margin-bottom:8px;line-height:1.6;position:relative;padding-left:24px}
+.ba-box li::before{content:'•';position:absolute;left:0;color:var(--accent)}
+.ba-arrow{text-align:center;font-size:56px;color:var(--accent);filter:drop-shadow(0 0 12px var(--accent))}
+
+/* ── 响应式 ── */
+@media(max-width:768px){
+  .s{padding:40px 16px}
+  #nav{width:220px}
+  .ba-compare{grid-template-columns:1fr;gap:12px}
+  .ba-arrow{transform:rotate(90deg);font-size:32px;margin:8px 0}
+  .card-grid{grid-template-columns:1fr}
+  .flow-row{flex-direction:column;gap:10px;overflow:visible}
+  .flow-step{max-width:none;width:100%}
+  .flow-link{min-width:2px;flex:0 0 42px;width:2px;height:42px;margin:0 auto;background:linear-gradient(180deg,rgba(56,189,248,.35),rgba(56,189,248,.95))}
+  .flow-link::after{right:50%;top:auto;bottom:-1px;transform:translateX(50%) rotate(135deg)}
+}
+
+@media(max-height:600px) and (orientation:landscape){
+  .s{padding:20px 18vw 20px 12vw; min-height:100vh;}
+  .s h1{font-size:clamp(28px,5vw,42px);margin-bottom:12px}
+  .s h2{font-size:clamp(24px,4vw,32px);margin-bottom:12px}
+  .sub{font-size:16px;margin-bottom:16px}
+  .card{padding:16px}
+  .card .icon{font-size:32px;margin-bottom:10px}
+  .card h4{font-size:18px;margin-bottom:8px}
+  .card p{font-size:14px;line-height:1.4;margin-bottom:0}
+  .ba-compare{margin:16px 0;gap:12px}
+  .ba-box{padding:16px}
+  .ba-box h4{font-size:18px;margin-bottom:8px}
+  .ba-box p,.ba-box li{font-size:14px}
+  .quote{padding:16px 20px;font-size:16px;margin:16px 0}
+  .page-ctrl{right: 16vw;}
+  #to-top{right: 16vw;}
+  #page-num{left: 10vw;}
+  #menu-btn{left: 10vw;}
+}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<button id="menu-btn" aria-label="导航菜单">☰</button>
+
+<nav id="nav">
+  <a href="#s1"><span class="num">01</span> Effective Harnesses for Long-Running Agents</a>
+  <a href="#s2"><span class="num">02</span> 长任务为什么容易失控？</a>
+  <a href="#s3"><span class="num">03</span> Two-Fold Solution：角色分工</a>
+  <a href="#s4"><span class="num">04</span> Initializer 四项交接资产</a>
+  <a href="#s5"><span class="num">05</span> Coding Agent 增量纪律</a>
+  <a href="#s6"><span class="num">06</span> 从感觉完成到端到端验收</a>
+  <a href="#s7"><span class="num">07</span> 未来方向</a>
+  <a href="#s8"><span class="num">08</span> 一句话总结：框架决定上限</a>
+</nav>
+
+<div id="page-num">1 / 8</div>
+<div class="page-ctrl">
+  <button id="prev-btn" aria-label="上一页">▲</button>
+  <button id="next-btn" aria-label="下一页">▼</button>
+</div>
+<button id="to-top" aria-label="返回顶部">⇧</button>
+
+<!-- ================= Section 1 ================= -->
+<section class="s" id="s1">
+  <div class="inner" style="text-align:center">
+    <div class="tag">Anthropic 25.11 官方博客解读</div>
+    <p style="font-size:13px;color:var(--text-dim);opacity:0.7;letter-spacing:2px;margin:12px 0 0">原文发布于 2025年11月26日</p>
+    <h1>长任务 Agent 能不能做成，<br/><span style="font-size:clamp(32px,5vw,56px);color:var(--accent)">关键在 Harness，不在模型</span></h1>
+    <p class="sub" style="margin-top:16px">这期拆解 Anthropic 原文：《Effective harnesses for long-running agents》</p>
+    <div class="divider" style="margin:24px auto"></div>
+    <div style="display:flex;justify-content:center;gap:12px;margin:20px 0 8px;flex-wrap:wrap">
+      <span style="padding:6px 18px;border-radius:20px;border:1px solid rgba(56,189,248,0.35);font-size:14px;color:var(--accent)">① 问题根因</span>
+      <span style="padding:6px 18px;border-radius:20px;border:1px solid rgba(129,140,248,0.35);font-size:14px;color:var(--accent2)">② Two-Fold 方案</span>
+      <span style="padding:6px 18px;border-radius:20px;border:1px solid rgba(52,211,153,0.35);font-size:14px;color:var(--green)">③ 端到端验收</span>
+    </div>
+    <div class="quote" style="background:transparent;border:none;box-shadow:none;text-align:center;padding:0;font-size:22px;font-style:italic">
+      “Anthropic 用真实工程实践给出了答案：<br/>不是更强的模型，<br/>而是能让 Agent 在离散窗口间稳定接力的 Harness 框架。”
+    </div>
+    <p style="margin-top:60px;font-size:13px;color:var(--text-dim);opacity:0.6;letter-spacing:2px">↓ SCROLL TO EXPLORE ↓</p>
+  </div>
+</section>
+
+<!-- ================= Section 2 ================= -->
+<section class="s" id="s2">
+  <div class="inner">
+    <h2 style="margin-bottom:16px">长任务为什么容易失控？</h2>
+    <div class="divider"></div>
+    <p class="sub" style="margin-bottom:20px">根源在于离散窗口接力——三重挑战，导致两种典型失败</p>
+
+    <div class="card-grid" style="grid-template-columns:repeat(3,1fr);gap:16px;margin-top:0">
+      <div class="card" style="padding:22px 18px">
+        <div class="icon" style="font-size:38px;margin-bottom:14px">🪟</div>
+        <h4>上下文分段</h4>
+        <p>没有交接资产，每次进入新窗口都要重新摸索</p>
+      </div>
+      <div class="card" style="padding:22px 18px">
+        <div class="icon" style="font-size:38px;margin-bottom:14px">🧠</div>
+        <h4>记忆不连续</h4>
+        <p>进度必须靠环境中的结构化信息传递，而非天然记忆</p>
+      </div>
+      <div class="card" style="padding:22px 18px">
+        <div class="icon" style="font-size:38px;margin-bottom:14px">🧹</div>
+        <h4>状态不干净</h4>
+        <p>上一轮半成品放大错误，消耗下一轮大量上下文去救火</p>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin:14px 0 10px;font-size:12px;letter-spacing:3px;color:var(--text-dim);opacity:0.45">↓ &nbsp;由此导致两种典型失败&nbsp; ↓</div>
+
+    <div class="card-grid" style="grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card" style="border-color:rgba(251,113,133,.3);padding:22px 24px">
+        <div class="icon" style="font-size:38px;margin-bottom:14px">💥</div>
+        <h4 style="color:var(--red)">一次做太多</h4>
+        <p>上下文耗尽，只留下无法接手的中间态</p>
+      </div>
+      <div class="card" style="border-color:rgba(129,140,248,.3);padding:22px 24px">
+        <div class="icon" style="font-size:38px;margin-bottom:14px">🏳️</div>
+        <h4 style="color:var(--accent2)">过早宣布完成</h4>
+        <p>功能看似可用就收工，真实用户路径未跑通</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 3 ================= -->
+<section class="s" id="s3">
+  <div class="inner">
+    <h2 style="text-align:center">Two-Fold Solution：角色分工</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    <p class="sub" style="text-align:center">不是让一个 Agent 跑全场，而是通过分工强制建立“边界”和“交接制度”</p>
+
+    <div style="display:flex;flex-direction:column;gap:16px;margin-top:40px">
+      <!-- Initializer Agent -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;padding:24px 32px;border-left:4px solid var(--accent)">
+        <div style="font-size:48px;width:60px;text-align:center;color:var(--accent)">1</div>
+        <div>
+          <h4 style="color:var(--accent);margin-bottom:8px;font-size:22px">Initializer Agent</h4>
+          <p style="margin:0;font-size:16px;color:#fff">只在第一轮出现：搭环境、建规则、留文档</p>
+        </div>
+      </div>
+
+      <!-- 交接资产 -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;padding:24px 32px;border-left:4px solid var(--accent2)">
+        <div style="font-size:36px;width:60px;text-align:center;color:var(--accent2);opacity:0.7">↓</div>
+        <div>
+          <h4 style="color:var(--accent2);margin-bottom:8px;font-size:22px">Initializer 的产出：四项交接资产</h4>
+          <p style="margin:0;font-size:15px;color:var(--text-dim)">init.sh &nbsp;·&nbsp; claude-progress.txt &nbsp;·&nbsp; git commit &nbsp;·&nbsp; feature list (JSON)</p>
+        </div>
+      </div>
+
+      <!-- Coding Agent 循环 -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;padding:24px 32px;border-left:4px solid var(--green)">
+        <div style="font-size:48px;width:60px;text-align:center;color:var(--green)">3</div>
+        <div>
+          <h4 style="color:var(--green);margin-bottom:8px;font-size:22px">Coding Agent 循环</h4>
+          <p style="margin:0;font-size:16px;color:#fff">读取状态 → 最小增量实现 → 验证 → 提交 → 可交接</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 4 ================= -->
+<section class="s" id="s4">
+  <div class="inner">
+    <h2>Initializer 四项交接资产</h2>
+    <div class="divider"></div>
+    <p class="sub">第一轮结束前必须交付，后续轮次才能稳定接力</p>
+
+    <div class="asset-grid">
+      <div class="asset-card ac1">
+        <div class="ac-ghost">01</div>
+        <div class="ac-icon-row"><div class="ac-icon">📜</div><div class="ac-badge">启动脚本</div></div>
+        <div class="ac-name">init.sh</div>
+        <p class="ac-desc">一键启动环境和验证流程，避免重复配置</p>
+      </div>
+      <div class="asset-card ac2">
+        <div class="ac-ghost">02</div>
+        <div class="ac-icon-row"><div class="ac-icon">📝</div><div class="ac-badge">进度日志</div></div>
+        <div class="ac-name">claude-progress.txt</div>
+        <p class="ac-desc">记录进度和下一步建议，减少接手成本</p>
+      </div>
+      <div class="asset-card ac3">
+        <div class="ac-ghost">03</div>
+        <div class="ac-icon-row"><div class="ac-icon">📌</div><div class="ac-badge">代码基线</div></div>
+        <div class="ac-name">git commit</div>
+        <p class="ac-desc">提供基线，便于回滚和比较</p>
+      </div>
+      <div class="asset-card ac4">
+        <div class="ac-ghost">04</div>
+        <div class="ac-icon-row"><div class="ac-icon">📋</div><div class="ac-badge">验收清单</div></div>
+        <div class="ac-name">feature list (JSON)</div>
+        <p class="ac-desc">显式“完成定义”，防止 Agent 凭感觉结束任务</p>
+        <div class="ac-warn">⚠ Agent 只能改 <code style="font-family:monospace">passes</code> 字段，禁止删改条目——这是防止“偷改清单蛒混过关”的强约束</div>
+      </div>
+    </div>
+
+    <div class="quote" style="font-size:18px;padding:20px;margin-top:28px;border-left-color:var(--orange);background:linear-gradient(90deg, rgba(251,191,36,0.08), transparent)">
+      <strong>关键点：</strong>feature list 不是普通待办，而是防止“凭感觉结束”的验收锚点
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 5 ================= -->
+<section class="s" id="s5">
+  <div class="inner">
+    <h2 style="text-align:center">Coding Agent 增量纪律</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    <p class="sub" style="text-align:center">每轮只做一个“最小增量”，用工程化节奏约束 Agent 的执行边界</p>
+
+    <div class="flow-row">
+      <div class="flow-step s1">
+        <div class="n">1</div>
+        <div class="flow-en">READ</div>
+        <h4>读取状态</h4>
+        <p>查看 `pwd`、进度记录、feature list、git log</p>
+      </div>
+      <div class="flow-link" aria-hidden="true"></div>
+      <div class="flow-step s2">
+        <div class="n">2</div>
+        <div class="flow-en">BUILD</div>
+        <h4>实现一件事</h4>
+        <p>只处理一个优先级最高的 feature，避免“一次做太多”</p>
+      </div>
+      <div class="flow-link" aria-hidden="true"></div>
+      <div class="flow-step s3">
+        <div class="n">3</div>
+        <div class="flow-en">VERIFY</div>
+        <h4>本轮验证</h4>
+        <p>做完立刻验证，确保环境持续可运行、可交接</p>
+      </div>
+      <div class="flow-link" aria-hidden="true"></div>
+      <div class="flow-step s4">
+        <div class="n">4</div>
+        <div class="flow-en">LOG</div>
+        <h4>更新进度</h4>
+        <p>记录已完成、待完成及下一步建议</p>
+      </div>
+      <div class="flow-link" aria-hidden="true"></div>
+      <div class="flow-step s5">
+        <div class="n">5</div>
+        <div class="flow-en">COMMIT</div>
+        <h4>提交交接</h4>
+        <p>git commit 带描述，保持环境干净</p>
+      </div>
+    </div>
+    <div class="startup-seq">
+      <div class="ss-head">Getting up to speed · 每轮启动序列</div>
+      <div class="ss-row">
+        <div class="ss-item"><code>pwd</code> 确认目录</div>
+        <span class="ss-sep">→</span>
+        <div class="ss-item">读 git log + progress</div>
+        <span class="ss-sep">→</span>
+        <div class="ss-item">选最高优先 feature</div>
+        <span class="ss-sep">→</span>
+        <div class="ss-item">跟 init.sh 启动服务</div>
+        <span class="ss-sep">→</span>
+        <div class="ss-item">基线验证通过再开始</div>
+      </div>
+    </div>
+    <div class="flow-loop">
+      <svg viewBox="0 0 800 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="loopArrow" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8"/>
+          </marker>
+          <linearGradient id="loopGrad04" x1="700" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#fb7185"/>
+            <stop offset="50%" stop-color="#818cf8"/>
+            <stop offset="100%" stop-color="#38bdf8"/>
+          </linearGradient>
+        </defs>
+        <path d="M 700 4 Q 790 4, 790 18 Q 790 32, 700 32 L 100 32 Q 10 32, 10 18 Q 10 4, 100 4"
+              stroke="url(#loopGrad04)" stroke-width="2" stroke-dasharray="6 3"
+              marker-end="url(#loopArrow)" fill="none"/>
+        <text x="400" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="2">每轮循环执行，直到所有 feature 验收通过</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 6 ================= -->
+<section class="s" id="s6">
+  <div class="inner">
+    <h2 style="text-align:center">从“感觉完成”到端到端验收</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    <p class="sub" style="text-align:center">单测和接口冒烟不够，必须按真实用户方式跑完整路径</p>
+
+    <div class="ba-compare">
+      <div class="ba-box before">
+        <h4 style="color:var(--red)"><span style="font-size:32px;margin-right:8px">❌</span> 感觉完成</h4>
+        <ul>
+          <li>代码运行，局部测试通过</li>
+          <li>接口响应正常</li>
+          <li>用户路径未完整验证</li>
+        </ul>
+      </div>
+      
+      <div class="ba-arrow">➔</div>
+      
+      <div class="ba-box after">
+        <h4 style="color:var(--green)"><span style="font-size:32px;margin-right:8px">✅</span> 验收完成</h4>
+        <ul>
+          <li>浏览器自动化完整流程</li>
+          <li>交互和状态变化正确</li>
+          <li>用户视角路径真正跑通</li>
+        </ul>
+      </div>
+    </div>
+    <div class="quote" style="font-size:16px;padding:14px 20px;margin-top:20px;border-left-color:rgba(148,163,184,0.5);background:rgba(255,255,255,0.03);opacity:0.8">
+      <strong style="color:var(--orange)">⚠ 已知局限：</strong>Claude 目前无法通过 Puppeteer MCP 看到浏览器原生 alert 弹窗，依赖 alert 的功能需要额外关注
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 7 ================= -->
+<section class="s" id="s7">
+  <div class="inner">
+    <h2 style="text-align:center">未来方向</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    <p class="sub" style="text-align:center">原文指出的两个开放问题，也是下一步值得关注的方向</p>
+
+    <div class="fw-grid">
+      <div class="fw-card" style="border-left-color:var(--accent)">
+        <h4>🧩 单 Agent vs 多 Agent 架构</h4>
+        <p>现有方案由一个通用 Coding Agent 串联所有上下文窗口。但专职化的 Testing Agent、QA Agent、代码清理 Agent 是否能在各子任务上表现更好？这个问题目前尚没有明确答案。</p>
+      </div>
+      <div class="fw-card" style="border-left-color:var(--orange)">
+        <h4>🌍 迁移到 Web 之外</h4>
+        <p>现有 Harness 针对全栈 Web 应用优化。这套方法能否推广到科学研究、金融建模等其他长周期 Agent 任务场景？原文认为有很大潜力。</p>
+      </div>
+    </div>
+
+    <div class="quote" style="font-size:18px;padding:20px;margin-top:28px;border-left-color:var(--accent2);background:linear-gradient(90deg,rgba(129,140,248,0.08),transparent)">
+      <strong>关键洞察：</strong>不要把现在的 Harness 设计当成终态——它是现阶段的最佳实践，下一阶段的更多可能性已在路上。
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 8 ================= -->
+<section class="s" id="s8">
+  <div class="inner" style="text-align:center">
+    <h2>一句话总结：工程化框架决定上限</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    
+    <div class="quote" style="font-size:clamp(24px,3.5vw,40px);text-align:center;border-left:none;background:transparent;box-shadow:none;line-height:1.5;margin-top:40px">
+      "Agent 想稳定交付长任务，<br/>决定上限的不是模型性能，<br/>而是工程化 Harness。"
+    </div>
+    
+    <p style="font-size:22px;color:var(--text-dim);margin-top:40px">
+      Anthropic 的实践验证了这一点：<br/>
+      <span style="color:#fff;font-weight:bold">交接资产保障起点，增量节奏控制过程，端到端验收定义终点</span>——<br/>
+      三层机制齐备，长任务才真正可控。
+    </p>
+
+    <div style="margin-top:60px;font-size:14px;color:var(--text-dim);opacity:0.5">
+      点个关注不迷路，我们下期见
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const sections = Array.from(document.querySelectorAll('.s'));
+  const navLinks = Array.from(document.querySelectorAll('#nav a'));
+  const nav = document.getElementById('nav');
+  const menuBtn = document.getElementById('menu-btn');
+  const progress = document.getElementById('progress');
+  const toTop = document.getElementById('to-top');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const pageNum = document.getElementById('page-num');
+  const total = sections.length;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  let current = 0;
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('visible');
+      const idx = sections.indexOf(entry.target);
+      if (idx !== -1) {
+        current = idx;
+        updateUi();
+      }
+    });
+  }, { threshold: 0.18 });
+  sections.forEach(s => io.observe(s));
+
+  function updateUi(){
+    navLinks.forEach((a,i)=>a.classList.toggle('active',i===current));
+    progress.style.height = ((current + 1) / total * 100) + '%';
+    pageNum.textContent = (current + 1) + ' / ' + total;
+    toTop.classList.toggle('show', current > 0);
+  }
+
+  function goTo(idx){
+    if (idx < 0 || idx >= total) return;
+    sections[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  menuBtn.addEventListener('click', () => {
+    nav.classList.toggle('open');
+    menuBtn.textContent = nav.classList.contains('open') ? '✕' : '☰';
+  });
+
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      nav.classList.remove('open');
+      menuBtn.textContent = '☰';
+    });
+  });
+
+  prevBtn.addEventListener('click', () => goTo(current - 1));
+  nextBtn.addEventListener('click', () => goTo(current + 1));
+  toTop.addEventListener('click', () => goTo(0));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+      e.preventDefault();
+      goTo(current + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+      e.preventDefault();
+      goTo(current - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      goTo(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      goTo(total - 1);
+    }
+  });
+
+  if (!isMobile) {
+    let wheelLock = false;
+    let wheelAccum = 0;
+    let wheelResetTimer = null;
+
+    window.addEventListener('wheel', (e) => {
+      if (wheelLock) return;
+      wheelAccum += e.deltaY;
+      if (wheelResetTimer) clearTimeout(wheelResetTimer);
+      wheelResetTimer = setTimeout(() => { wheelAccum = 0; }, 120);
+
+      if (Math.abs(wheelAccum) < 90) return;
+
+      e.preventDefault();
+      if (wheelAccum > 0) goTo(current + 1);
+      else goTo(current - 1);
+
+      wheelAccum = 0;
+      wheelLock = true;
+      setTimeout(() => { wheelLock = false; }, 560);
+    }, { passive: false });
+  }
+
+  let touchY = 0;
+  window.addEventListener('touchstart', (e) => {
+    touchY = e.touches[0].clientY;
+  }, { passive: true });
+
+  window.addEventListener('touchend', (e) => {
+    const dy = touchY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) < 70) return;
+    if (dy > 0) goTo(current + 1);
+    else goTo(current - 1);
+  }, { passive: true });
+
+  updateUi();
+})();
+</script>
+</body>
+</html>

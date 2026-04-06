@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Harness设计：让长任务应用开发不失控</title>
+<meta name="description" content="Anthropic 3.24 论文深度解析：为什么单体 Agent 会失控？三层 Harness 架构如何重塑 AI 编程范式？"/>
+<meta name="theme-color" content="#1a1a2e"/>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiSGFybmVzcxI6IiN1YTEiLCJzdGFydF91cmwiOiIuIiwiYmFja2dyb3VuZF9jb2xvciI6IiMxYTFhMmUiLCJ0aGVtZV9jb2xvciI6IiMxYTFhMmUifQ=="/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg1:#0f172a;--bg2:#1e293b;--bg3:#334155;
+  --accent:#38bdf8;--accent2:#818cf8;--green:#34d399;--orange:#fbbf24;--red:#fb7185;
+  --text:#f8fafc;--text-dim:#94a3b8;--code-bg:#0d1117;
+  --card-bg:rgba(255,255,255,0.03);--card-border:rgba(255,255,255,0.08);
+  --transition:0.4s cubic-bezier(.25,.8,.25,1)
+}
+html{scroll-behavior:smooth;scroll-snap-type:y mandatory;overflow-y:scroll;scrollbar-width:thin;scrollbar-color:var(--accent) var(--bg1)}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:radial-gradient(circle at 50% 0%, #1e293b 0%, var(--bg1) 100%);color:var(--text);line-height:1.8;overflow-x:hidden;letter-spacing:0.02em;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body::before{content:'';position:fixed;top:0;left:0;width:100vw;height:100vh;background-image:linear-gradient(rgba(56,189,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.03) 1px,transparent 1px);background-size:40px 40px;z-index:-2;pointer-events:none}
+body::after{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 50% 50%, rgba(129,140,248,0.08), transparent 30%), radial-gradient(circle at 80% 20%, rgba(56,189,248,0.06), transparent 25%);z-index:-1;pointer-events:none;animation:bgPulse 20s ease-in-out infinite alternate}
+@keyframes bgPulse {
+  0% { transform: scale(1) rotate(0deg); opacity: 0.5; }
+  100% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
+
+/* ── 加载进度条 ── */
+#progress{position:fixed;top:0;right:0;width:4px;height:0;background:linear-gradient(180deg,var(--accent),var(--accent2));z-index:1000;transition:height .25s;border-radius:0 0 0 4px}
+
+/* ── 侧边导航 ── */
+#nav{position:fixed;top:0;left:0;width:260px;height:100vh;background:rgba(15,23,42,.94);backdrop-filter:blur(14px);border-right:1px solid var(--card-border);z-index:900;transform:translateX(-100%);transition:transform var(--transition);overflow-y:auto;padding:56px 0 20px;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
+#nav.open{transform:translateX(0)}
+#nav a{display:block;padding:7px 18px;color:var(--text-dim);font-size:13px;text-decoration:none;border-left:3px solid transparent;transition:all .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#nav a:hover,#nav a.active{color:var(--accent);border-left-color:var(--accent);background:rgba(56,189,248,.06)}
+#nav a .num{display:inline-block;width:22px;color:var(--accent2);font-weight:700;font-size:11px}
+#menu-btn{position:fixed;top:14px;left:14px;z-index:950;width:40px;height:40px;border:none;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text);font-size:20px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+#menu-btn:hover{background:var(--accent)}
+
+/* ── Section ── */
+.s{min-height:100vh;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;padding:80px 6vw;position:relative}
+.s .inner{max-width:1600px;width:100%;opacity:0;transform:translateY(40px);transition:opacity .7s,transform .7s}
+.s.visible .inner{opacity:1;transform:translateY(0)}
+
+/* ── 排版 ── */
+.s h1{font-size:clamp(64px,8vw,96px);font-weight:900;line-height:1.2;margin-bottom:32px;background:linear-gradient(135deg,#fff 20%,var(--accent) 80%,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.02em;filter:drop-shadow(0 0 20px rgba(56,189,248,0.3));animation:titleShine 4s linear infinite}
+@keyframes titleShine {
+  0%, 100% { filter: drop-shadow(0 0 15px rgba(56,189,248,0.2)); }
+  50% { filter: drop-shadow(0 0 30px rgba(56,189,248,0.5)); }
+}
+.s h2{font-size:clamp(44px,6vw,64px);font-weight:700;margin-bottom:32px;color:#fff;letter-spacing:-0.01em}
+.s h3{font-size:clamp(32px,4vw,48px);font-weight:600;margin-bottom:24px;color:var(--accent)}
+.s p,.s li{color:var(--text-dim);margin-bottom:16px;line-height:1.7;font-size:clamp(20px,2vw,26px)}
+.sub{font-size:clamp(28px,3vw,40px);color:var(--text-dim);margin-bottom:40px}
+.divider{width:60px;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;margin:16px 0}
+.tag{display:inline-block;padding:10px 24px;border-radius:8px;font-size:20px;font-weight:700;background:rgba(56,189,248,.1);color:var(--accent);margin:8px;border:1px solid rgba(56,189,248,.3);text-transform:uppercase;letter-spacing:2px;box-shadow:0 0 10px rgba(56,189,248,.2)}
+
+/* ── Skill 绿色高亮 ── */
+.sk{color:var(--green);font-weight:700}
+
+/* ── 卡片网格 ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:32px;margin-top:32px}
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px;transition:all .4s cubic-bezier(0.175, 0.885, 0.32, 1.275);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 16px rgba(0,0,0,0.2);position:relative;overflow:hidden;backdrop-filter:blur(10px)}
+.card::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);transform:skewX(-20deg);transition:0.5s}
+.card:hover{transform:translateY(-6px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.1), 0 12px 32px rgba(56,189,248,0.15);border-color:rgba(56,189,248,0.4)}
+.card:hover::after{left:150%}
+.card .icon{font-size:68px;margin-bottom:28px;filter:drop-shadow(0 0 8px rgba(255,255,255,0.2))}
+.card h4{font-size:34px;color:#fff;margin-bottom:16px}
+.card p{font-size:22px;color:var(--text-dim);line-height:1.6}
+
+/* ── 大卡片 ── */
+.big-card{background:linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:44px;margin-top:28px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 24px rgba(0,0,0,0.2);position:relative}
+.big-card::before{content:'';position:absolute;top:-1px;left:20px;width:60px;height:2px;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.big-card h4{font-size:30px;color:var(--accent);margin-bottom:16px}
+
+/* ── Before→After 对比 ── */
+.ba-compare{display:grid;grid-template-columns:1fr 80px 1fr;gap:28px;align-items:center;margin:40px 0}
+.ba-box{background:var(--card-bg);border:1px solid var(--card-border);border-radius:18px;padding:40px;height:100%}
+.ba-box.before{border-color:rgba(251,113,133,.3);background:linear-gradient(180deg, rgba(251,113,133,0.05) 0%, transparent 100%)}
+.ba-box.after{border-color:rgba(52,211,153,.3);background:linear-gradient(180deg, rgba(52,211,153,0.05) 0%, transparent 100%)}
+.ba-box h4{font-size:36px;margin-bottom:20px;display:flex;align-items:center;gap:10px;font-weight:700}
+.ba-box p{font-size:22px;color:var(--text-dim);margin-bottom:12px;line-height:1.6}
+.ba-arrow{text-align:center;font-size:56px;color:var(--accent);filter:drop-shadow(0 0 12px var(--accent))}
+
+/* ── 引用框 ── */
+.quote{border-left:5px solid var(--accent);padding:28px 36px;background:rgba(56,189,248,.04);border-radius:0 14px 14px 0;font-size:26px;font-style:italic;color:var(--text);margin:32px 0;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+.quote::after{content:'"';position:absolute;right:24px;bottom:-30px;font-size:120px;color:rgba(255,255,255,0.03);font-family:serif;line-height:1}
+
+/* ── 翻页控制与页码 ── */
+.page-ctrl{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:800}
+.page-ctrl button{width:44px;height:44px;border:none;border-radius:12px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text);font-size:18px;cursor:pointer;transition:background .2s;border:1px solid rgba(255,255,255,0.1)}
+.page-ctrl button:hover{background:var(--accent);color:#0f172a;border-color:var(--accent)}
+#to-top{position:fixed;bottom:136px;right:24px;width:44px;height:44px;border:none;border-radius:12px;background:rgba(129,140,248,.8);color:#fff;font-size:18px;cursor:pointer;z-index:800;opacity:0;pointer-events:none;transition:opacity .3s;box-shadow:0 4px 12px rgba(129,140,248,0.3)}
+#to-top.show{opacity:1;pointer-events:auto}
+#page-num{position:fixed;bottom:24px;left:24px;background:rgba(15,23,42,.7);backdrop-filter:blur(8px);color:var(--text-dim);font-size:14px;padding:6px 14px;border-radius:20px;z-index:800;border:1px solid var(--card-border);font-family:"SF Mono","Fira Code",Consolas,monospace;letter-spacing:1px}
+
+/* ── 响应式 ── */
+@media(max-width:768px){
+  .s{padding:40px 16px}
+  #nav{width:220px}
+  .ba-compare{grid-template-columns:1fr;gap:12px}
+  .ba-arrow{transform:rotate(90deg);font-size:32px;margin:8px 0}
+  .card-grid{grid-template-columns:1fr}
+}
+
+@media(max-height:600px) and (orientation:landscape){
+  /* 为抖音侧边 UI 留出安全区，右侧留白更多（点赞/评论区） */
+  .s{padding:20px 18vw 20px 12vw; min-height:100vh;}
+  .s h1{font-size:clamp(28px,5vw,42px);margin-bottom:12px}
+  .s h2{font-size:clamp(24px,4vw,32px);margin-bottom:12px}
+  .sub{font-size:16px;margin-bottom:16px}
+  .card{padding:16px}
+  .card .icon{font-size:32px;margin-bottom:10px}
+  .card h4{font-size:18px;margin-bottom:8px}
+  .card p{font-size:14px;line-height:1.4;margin-bottom:0}
+  .big-card{padding:20px;margin-top:10px}
+  .ba-compare{margin:16px 0;gap:12px}
+  .ba-box{padding:16px}
+  .ba-box h4{font-size:18px;margin-bottom:8px}
+  .ba-box p{font-size:14px}
+  .data-table th{padding:10px;font-size:14px}
+  .data-table td{padding:10px;font-size:12px}
+  .quote{padding:16px 20px;font-size:16px;margin:16px 0}
+  
+  /* 调整悬浮按钮避开抖音左右侧 UI */
+  .page-ctrl{right: 16vw;}
+  #to-top{right: 16vw;}
+  #page-num{left: 10vw;}
+  #menu-btn{left: 10vw;}
+}
+
+/* ── 数据表格 ── */
+.data-table{width:100%;border-collapse:collapse;margin:32px 0;background:rgba(255,255,255,.02);border-radius:14px;overflow:hidden}
+.data-table th{background:rgba(56,189,248,.1);color:var(--accent);padding:20px;text-align:left;font-weight:700;font-size:24px;border-bottom:2px solid var(--accent)}
+.data-table td{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--text-dim);font-size:20px}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(56,189,248,.04)}
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<button id="menu-btn" aria-label="导航菜单">☰</button>
+
+<nav id="nav">
+  <a href="#s1"><span class="num">01</span> 核心观点：回到软件工程</a>
+  <a href="#s2"><span class="num">02</span> 第一层：单体 Agent 的两大致命伤</a>
+  <a href="#s3"><span class="num">03</span> 第二层：三层 Harness 架构</a>
+  <a href="#s4"><span class="num">04</span> 第二层延伸：工程逻辑重构</a>
+  <a href="#s5"><span class="num">05</span> 第三层：实验对比（复古游戏）</a>
+  <a href="#s6"><span class="num">06</span> 持续进化：脚手架不是固定模板</a>
+  <a href="#s7"><span class="num">07</span> 终局：它是一套驯化方法</a>
+</nav>
+
+<div id="page-num">1 / 7</div>
+<div class="page-ctrl">
+  <button id="prev-btn" aria-label="上一页">▲</button>
+  <button id="next-btn" aria-label="下一页">▼</button>
+</div>
+<button id="to-top" aria-label="返回顶部">⇧</button>
+
+<!-- ================= Section 1 ================= -->
+<section class="s" id="s1">
+  <div class="inner" style="text-align:center">
+    <div class="tag">Anthropic 3.24 官方博客解读</div>
+    <h1>为什么长任务开发中<br/><span style="font-size:clamp(32px,5vw,56px);color:var(--accent)">Agent 容易失控？</span></h1>
+    <p class="sub" style="margin-top:16px">深度解析《Harness design for long-running application development》</p>
+    <div class="divider" style="margin:24px auto"></div>
+    <div class="quote" style="background:transparent;border:none;box-shadow:none;text-align:center;padding:0;font-size:24px;font-style:italic">
+      "这篇文章真正的重点，其实不是这阵子很火的'多 Agent 分工'，<br/>而是怎么用 Harness（工程脚手架），<br/>把 AI 开发变成一个<strong style="color:var(--accent2)">可验证、可交付的工程过程</strong>。"
+    </div>
+    <p style="margin-top:60px;font-size:13px;color:var(--text-dim);opacity:0.6;letter-spacing:2px">↓ SCROLL TO EXPLORE ↓</p>
+  </div>
+</section>
+
+<!-- ================= Section 2 ================= -->
+<section class="s" id="s2">
+  <div class="inner">
+    <h2>第一层：单体 Agent 的两大致命伤</h2>
+    <div class="divider"></div>
+    <p class="sub">为什么丢给 AI 一个长任务，它总是做着做着就“崩”了？</p>
+    
+    <div class="card-grid" style="grid-template-columns:1fr 1fr">
+      <div class="card" style="border-color:rgba(251,113,133,.3)">
+        <div class="icon">🤯</div>
+        <h4 style="color:var(--red)">1. 上下文焦虑 (Context Anxiety)</h4>
+        <p>任务一长，模型明明没到极限，却开始提前敷衍收尾。</p>
+        <p style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.1)"><strong>表现：</strong>模型会因为感受到上下文逼近极限，而<strong style="color:var(--red)">强行、草率地提前"交卷"</strong>结项。</p>
+      </div>
+      
+      <div class="card" style="border-color:rgba(129,140,248,.3)">
+        <div class="icon">🤥</div>
+        <h4 style="color:var(--accent2)">2. 过度自信</h4>
+        <p>模型总高估自己的完成度，看着像做完了，实际上跑起来全是 Bug。</p>
+        <p style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,255,255,0.1)"><strong>表现：</strong>模型做完东西后，往往会<strong style="color:var(--accent2)">严重高估自己的完成度</strong>。表面看起来光鲜亮丽，实际跑起来一堆 Bug。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 3 ================= -->
+<section class="s" id="s3">
+  <div class="inner">
+    <h2 style="text-align:center">第二层：Anthropic 的解法（三层 Harness 架构）</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    <p class="sub" style="text-align:center">没有继续赌一个更强的“全能单体 Agent”，而是将<strong style="color:var(--green)">“做事”与“验收”拆开</strong>。</p>
+
+    <div style="display:flex;flex-direction:column;gap:16px;margin-top:40px">
+      <!-- Planner -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;padding:24px 32px;border-left:4px solid var(--accent)">
+        <div style="font-size:48px;width:60px;text-align:center;color:var(--accent)">1</div>
+        <div>
+          <h4 style="color:var(--accent);margin-bottom:8px;font-size:22px">规划者 (Planner)</h4>
+          <p style="margin:0;font-size:16px;color:#fff">将用户一句很短的自然语言需求，扩展成完整、结构化的产品规范 <strong style="color:var(--accent)">(Spec)</strong>。</p>
+        </div>
+      </div>
+
+      <!-- Generator -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;padding:24px 32px;border-left:4px solid var(--accent2)">
+        <div style="font-size:48px;width:60px;text-align:center;color:var(--accent2)">2</div>
+        <div>
+          <h4 style="color:var(--accent2);margin-bottom:8px;font-size:22px">生成者 (Generator)</h4>
+          <p style="margin:0;font-size:16px;color:#fff">按阶段 (Sprint) 去实现代码。不再是一气呵成，而是分步稳扎稳打。</p>
+        </div>
+      </div>
+
+      <!-- Evaluator -->
+      <div class="card" style="display:flex;align-items:center;gap:24px;padding:24px 32px;border-left:4px solid var(--green)">
+        <div style="font-size:48px;width:60px;text-align:center;color:var(--green)">3</div>
+        <div>
+          <h4 style="color:var(--green);margin-bottom:8px;font-size:22px">评估者 (Evaluator)</h4>
+          <p style="margin:0;font-size:16px;color:#fff">通过自动化工具 (如 Playwright) 去点页面、测功能、看状态，决定这一轮是否算过关。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 4 ================= -->
+<section class="s" id="s4">
+  <div class="inner">
+    <h2>第二层延伸：核心转变（工程逻辑重构）</h2>
+    <div class="divider"></div>
+    <p class="sub">这篇文章不是在讲怎么写提示词，它讲的是如何重新组织软件生命周期。</p>
+
+    <div class="ba-compare">
+      <div class="ba-box before">
+        <h4 style="color:var(--red)"><span style="font-size:32px;margin-right:8px">❌</span> 过去：单步跳跃</h4>
+        <div style="text-align:center;margin-top:32px">
+          <div style="background:rgba(255,255,255,0.05);padding:16px;border-radius:8px;font-size:20px;font-weight:bold">一句需求</div>
+          <div style="font-size:24px;color:var(--text-dim);margin:16px 0">⬇️ (直接生成)</div>
+          <div style="background:rgba(251,113,133,0.1);border:1px solid var(--red);padding:16px;border-radius:8px;font-size:20px;font-weight:bold;color:var(--red)">一堆(可能有Bug的)代码</div>
+        </div>
+      </div>
+      
+      <div class="ba-arrow">➔</div>
+      
+      <div class="ba-box after">
+        <h4 style="color:var(--green)"><span style="font-size:32px;margin-right:8px">✅</span> 现在：规约与验证驱动</h4>
+        <div style="text-align:center;margin-top:20px">
+          <div style="background:rgba(255,255,255,0.05);padding:12px;border-radius:8px;font-size:18px">需求 (Prompt)</div>
+          <div style="font-size:18px;color:var(--text-dim);margin:8px 0">⬇️</div>
+          <div style="background:rgba(56,189,248,0.1);border:1px solid var(--accent);padding:12px;border-radius:8px;font-size:18px;color:var(--accent)">完整规范 (Spec)</div>
+          <div style="font-size:18px;color:var(--text-dim);margin:8px 0">⬇️ (协商约定)</div>
+          <div style="background:rgba(129,140,248,0.1);border:1px solid var(--accent2);padding:12px;border-radius:8px;font-size:18px;color:var(--accent2)">阶段契约 (Sprint Contract)</div>
+          <div style="font-size:18px;color:var(--text-dim);margin:8px 0">⬇️</div>
+          <div style="background:rgba(52,211,153,0.1);border:1px solid var(--green);padding:12px;border-radius:8px;font-size:18px;color:var(--green)">代码实现 & 自动化验收</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 5 ================= -->
+<section class="s" id="s5">
+  <div class="inner">
+    <h2>第三层：实验结果（复古游戏开发对比）</h2>
+    <div class="divider"></div>
+    <p class="sub">Harness 目前并不是为了省钱省时，而是为了<strong style="color:var(--accent)">可验证的确定性</strong>。</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>测试方案</th>
+          <th>耗时</th>
+          <th>成本</th>
+          <th>最终交付结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:var(--text)">单体 Agent 基线</strong></td>
+          <td>~20 分钟</td>
+          <td>$9</td>
+          <td><span style="color:var(--red);font-weight:bold">核心玩法是坏的</span>。看似做完了，实体无法交互。</td>
+        </tr>
+        <tr>
+          <td><strong style="color:var(--accent)">Full Harness 架构</strong></td>
+          <td>~6 小时</td>
+          <td>$200</td>
+          <td><span style="color:var(--green);font-weight:bold">完整且可验证</span>。扩展出16个特性、10个冲刺周期，核心功能运转良好。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="quote" style="font-size:18px;padding:20px;margin-top:32px;border-left-color:var(--orange);background:linear-gradient(90deg, rgba(251,191,36,0.08), transparent)">
+      <strong>思考点：</strong>它现在依然更慢、更贵、更重。但它换来的，是把一堆“看起来差不多”的代码，变成了一个<strong style="color:var(--orange)">可以被测试、被追踪、被修正</strong>的工程过程。
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 6 ================= -->
+<section class="s" id="s6">
+  <div class="inner">
+    <h2 style="text-align:center">持续进化：脚手架不是固定模板</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    <p class="sub" style="text-align:center">💡 随着 Opus 4.6 模型能力的增强，Anthropic 开始<strong style="color:var(--accent)">主动删减 Harness 结构</strong></p>
+    
+    <div class="ba-compare" style="margin-top:48px">
+      <div class="ba-box" style="border-color:rgba(251,191,36,.3);background:linear-gradient(180deg, rgba(251,191,36,0.05) 0%, transparent 100%)">
+        <h4 style="color:var(--orange);font-size:32px;margin-bottom:24px">
+          <span style="font-size:40px;margin-right:12px">📦</span> Full Harness (早期)
+        </h4>
+        
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:rgba(56,189,248,0.1);border:1px solid var(--accent);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--accent);font-weight:bold;margin-bottom:8px">Planner</div>
+            <div style="font-size:14px;color:var(--text-dim)">需求 → 完整 Spec</div>
+          </div>
+          
+          <div style="background:rgba(129,140,248,0.1);border:1px solid var(--accent2);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--accent2);font-weight:bold;margin-bottom:8px">Sprint Contract</div>
+            <div style="font-size:14px;color:var(--text-dim)">强制拆分成多个冲刺周期</div>
+          </div>
+          
+          <div style="background:rgba(251,191,36,0.1);border:1px solid var(--orange);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--orange);font-weight:bold;margin-bottom:8px">Generator</div>
+            <div style="font-size:14px;color:var(--text-dim)">按 Sprint 分阶段实现</div>
+          </div>
+          
+          <div style="background:rgba(52,211,153,0.1);border:1px solid var(--green);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--green);font-weight:bold;margin-bottom:8px">Evaluator (每轮检查)</div>
+            <div style="font-size:14px;color:var(--text-dim)">每个 Sprint 结束后都要验证</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="ba-arrow">➔</div>
+      
+      <div class="ba-box" style="border-color:rgba(52,211,153,.3);background:linear-gradient(180deg, rgba(52,211,153,0.05) 0%, transparent 100%)">
+        <h4 style="color:var(--green);font-size:32px;margin-bottom:24px">
+          <span style="font-size:40px;margin-right:12px">⚡</span> Simplified (Opus 4.6)
+        </h4>
+        
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="background:rgba(56,189,248,0.1);border:1px solid var(--accent);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--accent);font-weight:bold;margin-bottom:8px">Planner</div>
+            <div style="font-size:14px;color:var(--text-dim)">需求 → 完整 Spec</div>
+          </div>
+          
+          <div style="background:rgba(100,100,100,0.1);border:1px dashed rgba(255,255,255,0.2);padding:16px;border-radius:10px;opacity:0.4">
+            <div style="font-size:18px;color:var(--text-dim);font-weight:bold;margin-bottom:8px;text-decoration:line-through">Sprint Contract</div>
+            <div style="font-size:14px;color:var(--text-dim)">🗑️ 已移除</div>
+          </div>
+          
+          <div style="background:rgba(251,191,36,0.1);border:1px solid var(--orange);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--orange);font-weight:bold;margin-bottom:8px">Generator</div>
+            <div style="font-size:14px;color:var(--text-dim)">直接实现（模型能力够强）</div>
+          </div>
+          
+          <div style="background:rgba(52,211,153,0.1);border:1px solid var(--green);padding:16px;border-radius:10px">
+            <div style="font-size:18px;color:var(--green);font-weight:bold;margin-bottom:8px">Evaluator (单次验收)</div>
+            <div style="font-size:14px;color:var(--text-dim)">⚡ 只在运行末尾检查一次</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="background:rgba(56,189,248,0.1);border-radius:12px;padding:28px;margin-top:48px;max-width:900px;margin-left:auto;margin-right:auto">
+      <p style="margin:0;font-size:20px;color:var(--accent);font-weight:bold;text-align:center;line-height:1.8">
+        "它的每一层，都是在补模型当前还做不到的事。<br/>一旦模型变强，昨天还必要的脚手架，今天就可能变成负担。"
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Section 7 ================= -->
+<section class="s" id="s7">
+  <div class="inner" style="text-align:center">
+    <h2>Harness 不是魔法</h2>
+    <div class="divider" style="margin:16px auto"></div>
+    
+    <div class="quote" style="font-size:clamp(24px,3.5vw,40px);text-align:center;border-left:none;background:transparent;box-shadow:none;line-height:1.5;margin-top:40px">
+      "它是一套把不稳定模型，<br/>慢慢<strong style="color:var(--green)">驯化成可交付工程系统</strong>的方法。"
+    </div>
+    
+    <p style="font-size:22px;color:var(--text-dim);margin-top:40px">
+      真正有价值的能力，不只是让 AI <strong>开始</strong>写代码。<br/>
+      <span style="color:#fff;font-weight:bold">而是让它在几个小时之后，还能持续把代码写对。</span>
+    </p>
+
+    <div style="margin-top:60px;font-size:14px;color:var(--text-dim);opacity:0.5">
+      The End · Thanks for reading
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const sections = document.querySelectorAll('.s');
+  const navLinks = document.querySelectorAll('#nav a');
+  const nav = document.getElementById('nav');
+  const menuBtn = document.getElementById('menu-btn');
+  const progress = document.getElementById('progress');
+  const toTop = document.getElementById('to-top');
+  let current = 0;
+  const total = sections.length;
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        const idx = Array.from(sections).indexOf(e.target);
+        current = idx;
+        updateNav(idx);
+        updateProgress();
+      }
+    });
+  }, { threshold: 0.1 });
+  sections.forEach(s => io.observe(s));
+
+  function updateNav(idx) {
+    navLinks.forEach((a, i) => a.classList.toggle('active', i === idx));
+  }
+  function updateProgress() {
+    const pct = ((current + 1) / total) * 100;
+    progress.style.height = pct + '%';
+    toTop.classList.toggle('show', current > 0);
+    
+    const pageNumEl = document.getElementById('page-num');
+    if (pageNumEl) {
+      pageNumEl.textContent = (current + 1) + ' / ' + total;
+    }
+  }
+
+  menuBtn.addEventListener('click', () => {
+    nav.classList.toggle('open');
+    menuBtn.textContent = nav.classList.contains('open') ? '✕' : '☰';
+  });
+  navLinks.forEach(a => a.addEventListener('click', () => {
+    nav.classList.remove('open');
+    menuBtn.textContent = '☰';
+  }));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) {
+      e.preventDefault(); goTo(current + 1);
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) {
+      e.preventDefault(); goTo(current - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault(); goTo(0);
+    } else if (e.key === 'End') {
+      e.preventDefault(); goTo(total - 1);
+    }
+  });
+
+  document.getElementById('prev-btn').addEventListener('click', () => goTo(current - 1));
+  document.getElementById('next-btn').addEventListener('click', () => goTo(current + 1));
+  toTop.addEventListener('click', () => goTo(0));
+
+  function goTo(idx) {
+    if (idx < 0 || idx >= total) return;
+    sections[idx].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  let wheelLock = false;
+  window.addEventListener('wheel', e => {
+    if (wheelLock) return;
+    wheelLock = true;
+    if (e.deltaY > 30) goTo(current + 1);
+    else if (e.deltaY < -30) goTo(current - 1);
+    setTimeout(() => wheelLock = false, 800);
+  }, { passive: true });
+
+  let touchY = 0;
+  window.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchend', e => {
+    const dy = touchY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) > 60) {
+      dy > 0 ? goTo(current + 1) : goTo(current - 1);
+    }
+  }, { passive: true });
+
+})();
+</script>
+</body>
+</html>

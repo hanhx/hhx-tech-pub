@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>08 SDD 研发范式 封面生成</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:#111; padding:40px; display:flex; flex-direction:column; gap:60px; align-items:center; }
+    .export-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .export-label { color:#fff; font-size:24px; font-weight:700; }
+    .export-btn { background:linear-gradient(135deg,#00d2ff,#3a7bd5); color:#fff; border:none; padding:12px 24px; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; }
+    .export-all-btn { position:fixed; top:40px; right:40px; background:linear-gradient(135deg,#00d2ff,#3a7bd5); color:#fff; border:none; padding:16px 32px; border-radius:12px; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 8px 24px rgba(0,210,255,0.4); z-index:1000; }
+
+    .cover { position:relative; overflow:hidden; border:3px solid #333; box-shadow:0 20px 60px rgba(0,0,0,0.5); background: radial-gradient(circle at 50% 30%, #1a1c29 0%, #0d0e15 100%); }
+    .cover-3-4 { width:810px; height:1080px; }
+    .cover-4-3 { width:1440px; height:1080px; }
+
+    /* 通用装饰 */
+    .glow-top { position: absolute; top: -150px; left: 50%; transform: translateX(-50%); width: 800px; height: 500px; background: radial-gradient(ellipse at center, rgba(0, 210, 255, 0.25) 0%, transparent 70%); z-index: 1; }
+    .grid-bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: linear-gradient(rgba(255,255,255,0.03) 2px, transparent 2px), linear-gradient(90deg, rgba(255,255,255,0.03) 2px, transparent 2px); background-size: 60px 60px; z-index: 2; }
+    .circle-dec { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.05); z-index: 1; }
+    .c1 { width: 700px; height: 700px; top: -100px; right: -200px; }
+    .c2 { width: 1000px; height: 1000px; bottom: -300px; left: -400px; }
+
+    .layer { position:relative; z-index:10; height:100%; display:flex; flex-direction:column; }
+
+    /* === 竖版 3:4 布局 === */
+    .v-lay { padding:60px 50px; align-items:center; }
+    .v-lay .series-tag { background: linear-gradient(90deg, #ff3366, #ff7b00); padding: 12px 30px; border-radius: 50px; color: white; font-size: 32px; font-weight: 900; letter-spacing: 4px; box-shadow: 0 10px 30px rgba(255, 51, 102, 0.5); border: 2px solid rgba(255,255,255,0.5); margin-bottom: 50px; margin-top: 20px; }
+    .v-lay .main-title { font-size: 65px; font-weight: 900; color: #ffffff; line-height: 1.2; text-shadow: 0 10px 40px rgba(0,0,0,0.9); letter-spacing: 2px; text-align: center; margin-bottom: 70px; white-space: nowrap; }
+    .v-lay .highlight-text { background: linear-gradient(to right, #00d2ff, #3a7bd5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 90px; display: block; margin-top: 20px; filter: drop-shadow(0 0 20px rgba(0, 210, 255, 0.5)); }
+    
+    .v-lay .pain-points { background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(0, 210, 255, 0.3); border-radius: 30px; padding: 45px; width: 100%; backdrop-filter: blur(20px); display: flex; flex-direction: column; gap: 30px; box-shadow: inset 0 0 40px rgba(0, 210, 255, 0.1); }
+    .v-lay .pain-item { display: flex; align-items: center; gap: 20px; }
+    .v-lay .pain-icon { width: 60px; height: 60px; background: rgba(255, 51, 102, 0.2); border: 3px solid #ff3366; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #ff3366; font-size: 35px; font-weight: 900; flex-shrink: 0; }
+    .v-lay .pain-text { color: #f1f5f9; font-size: 40px; font-weight: bold; }
+    .v-lay .pain-text span { color: #ff3366; }
+
+    .v-lay .bottom-punch { margin-top: auto; margin-bottom: 40px; font-size: 50px; font-weight: 900; color: #00d2ff; letter-spacing: 4px; text-shadow: 0 0 30px rgba(0, 210, 255, 0.7); border-top: 3px dashed rgba(0, 210, 255, 0.4); border-bottom: 3px dashed rgba(0, 210, 255, 0.4); padding: 25px 40px; background: rgba(0,0,0,0.5); text-align: center; white-space: nowrap; }
+
+    /* === 横版 4:3 布局 === */
+    .h-lay { padding:0 80px; display:grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center; }
+    .h-lay .left { display: flex; flex-direction: column; align-items: flex-start; gap: 50px; }
+    .h-lay .series-tag { background: linear-gradient(90deg, #ff3366, #ff7b00); padding: 12px 30px; border-radius: 40px; color: white; font-size: 34px; font-weight: 900; letter-spacing: 4px; box-shadow: 0 10px 30px rgba(255, 51, 102, 0.5); border: 2px solid rgba(255,255,255,0.5); }
+    .h-lay .main-title { font-size: 75px; font-weight: 900; color: #ffffff; line-height: 1.2; text-shadow: 0 10px 40px rgba(0,0,0,0.9); letter-spacing: 2px; white-space: nowrap; }
+    .h-lay .highlight-text { background: linear-gradient(to right, #00d2ff, #3a7bd5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 100px; display: block; margin-top: 15px; filter: drop-shadow(0 0 20px rgba(0, 210, 255, 0.5)); }
+    .h-lay .bottom-punch { font-size: 40px; font-weight: 900; color: #00d2ff; letter-spacing: 2px; border-left: 8px solid #00d2ff; padding-left: 25px; text-shadow: 0 0 20px rgba(0, 210, 255, 0.5); white-space: nowrap; }
+
+    .h-lay .right { display: flex; flex-direction: column; justify-content: center; }
+    .h-lay .pain-points { background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(0, 210, 255, 0.3); border-radius: 30px; padding: 50px; backdrop-filter: blur(20px); display: flex; flex-direction: column; gap: 40px; box-shadow: inset 0 0 40px rgba(0, 210, 255, 0.1); }
+    .h-lay .pain-item { display: flex; align-items: center; gap: 20px; }
+    .h-lay .pain-icon { width: 70px; height: 70px; background: rgba(255, 51, 102, 0.2); border: 3px solid #ff3366; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #ff3366; font-size: 40px; font-weight: 900; flex-shrink: 0; }
+    .h-lay .pain-text { color: #f1f5f9; font-size: 40px; font-weight: bold; }
+    .h-lay .pain-text span { color: #ff3366; }
+
+  </style>
+</head>
+<body>
+  <button class="export-all-btn" onclick="exportAll()">📥 一键导出全部封面</button>
+
+  <!-- 3:4 竖版 -->
+  <div>
+    <div class="export-header">
+      <div class="export-label">📱 3:4 竖版封面（810x1080）</div>
+      <button class="export-btn" onclick="exportCover('cover-3-4','08-sdd-cover-3x4.png')">导出此封面</button>
+    </div>
+    <div class="cover cover-3-4" id="cover-3-4">
+      <div class="glow-top"></div>
+      <div class="grid-bg"></div>
+      <div class="circle-dec c1"></div>
+      <div class="circle-dec c2"></div>
+
+      <div class="layer v-lay">
+        <div class="series-tag">【硬核实战拆解】</div>
+
+        <div class="main-title">
+          别再给 AI 当保姆了
+          <span class="highlight-text">增强型 SDD 实战</span>
+        </div>
+
+        <div class="pain-points">
+          <div class="pain-item">
+            <div class="pain-icon">X</div>
+            <div class="pain-text">人肉喂需求 <span>格式全丢</span></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-icon">X</div>
+            <div class="pain-text">AI 盲猜接口 <span>全靠试错</span></div>
+          </div>
+          <div class="pain-item">
+            <div class="pain-icon">X</div>
+            <div class="pain-text">脱离真实数据 <span>无法联调</span></div>
+          </div>
+        </div>
+
+        <div class="bottom-punch">4 大核心插件砸碎护城墙</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4:3 横版 -->
+  <div>
+    <div class="export-header">
+      <div class="export-label">🖥️ 4:3 横版封面（1440x1080）</div>
+      <button class="export-btn" onclick="exportCover('cover-4-3','08-sdd-cover-4x3.png')">导出此封面</button>
+    </div>
+    <div class="cover cover-4-3" id="cover-4-3">
+      <div class="glow-top" style="left: 0; transform: none; width: 600px;"></div>
+      <div class="grid-bg"></div>
+      <div class="circle-dec c1" style="right: -100px; top: 50px;"></div>
+
+      <div class="layer h-lay">
+        <div class="left">
+          <div class="series-tag">【硬核实战拆解】</div>
+          <div class="main-title">
+            别再给 AI 当保姆了
+            <span class="highlight-text">增强型 SDD 实战</span>
+          </div>
+          <div class="bottom-punch">4 大核心插件砸碎护城墙</div>
+        </div>
+        
+        <div class="right">
+          <div class="pain-points">
+            <div class="pain-item">
+              <div class="pain-icon">X</div>
+              <div class="pain-text">人肉喂需求 <span>格式全丢</span></div>
+            </div>
+            <div class="pain-item">
+              <div class="pain-icon">X</div>
+              <div class="pain-text">AI 盲猜接口 <span>全靠试错</span></div>
+            </div>
+            <div class="pain-item">
+              <div class="pain-icon">X</div>
+              <div class="pain-text">脱离数据 <span>无法联调</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function exportCover(id, fn) {
+      const el = document.getElementById(id);
+      const btn = event.target; const ot = btn.textContent;
+      btn.textContent = '导出中...'; btn.disabled = true;
+      try {
+        const c = await html2canvas(el, { scale:3, backgroundColor:null, logging:false, useCORS:true });
+        c.toBlob(blob => {
+          const u = URL.createObjectURL(blob), a = document.createElement('a');
+          a.download = fn; a.href = u; a.click(); URL.revokeObjectURL(u);
+          btn.textContent = '✅ 导出成功';
+          setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 2000);
+        });
+      } catch(e) {
+        btn.textContent = '❌ 失败';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 2000);
+      }
+    }
+    
+    async function exportAll() {
+      const btn = event.target; const ot = btn.textContent;
+      btn.textContent = '导出中... (1/2)'; btn.disabled = true;
+      try {
+        const c1 = await html2canvas(document.getElementById('cover-3-4'), { scale:3, backgroundColor:null, logging:false, useCORS:true });
+        await new Promise(r => c1.toBlob(b => { const u=URL.createObjectURL(b),a=document.createElement('a'); a.download='08-sdd-cover-3x4.png'; a.href=u; a.click(); URL.revokeObjectURL(u); r(); }));
+        btn.textContent = '导出中... (2/2)';
+        await new Promise(r => setTimeout(r, 500));
+        const c2 = await html2canvas(document.getElementById('cover-4-3'), { scale:3, backgroundColor:null, logging:false, useCORS:true });
+        await new Promise(r => c2.toBlob(b => { const u=URL.createObjectURL(b),a=document.createElement('a'); a.download='08-sdd-cover-4x3.png'; a.href=u; a.click(); URL.revokeObjectURL(u); r(); }));
+        btn.textContent = '✅ 全部导出成功';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 2000);
+      } catch(e) {
+        btn.textContent = '❌ 失败';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 2000);
+      }
+    }
+  </script>
+</body>
+</html>

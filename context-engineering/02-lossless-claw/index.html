@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>一页图讲清楚：lossless-claw —— ContextEngine 的无损记忆插件</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(52,152,219,0.10), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(155,89,182,0.08), transparent 28%),
+        linear-gradient(135deg, #f6f8fb, #eef3f9);
+      color: #1f2d3d;
+      height: 100vh;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+    }
+
+    .slide {
+      width: 96vw;
+      max-width: 1400px;
+      height: 92vh;
+      background: rgba(255,255,255,0.92);
+      border: 1px solid rgba(120,140,160,0.18);
+      border-radius: 22px;
+      box-shadow: 0 18px 50px rgba(31,45,61,0.12);
+      padding: 24px 28px 18px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 14px;
+      backdrop-filter: blur(8px);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      border-bottom: 1px solid #e8eef5;
+      padding-bottom: 12px;
+    }
+
+    .title-wrap h1 {
+      font-size: 30px;
+      line-height: 1.2;
+      color: #102235;
+      margin-bottom: 6px;
+      letter-spacing: 0.2px;
+    }
+    .title-wrap h1 span { color: #0f62fe; }
+
+    .title-wrap p {
+      font-size: 15px;
+      color: #5d6b7a;
+    }
+
+    .tag {
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #0f62fe, #4b8dff);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.18);
+    }
+
+    .summary {
+      background: linear-gradient(135deg, #103a5c, #155b8b);
+      color: #fff;
+      border-radius: 16px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .summary-text { font-size: 20px; font-weight: 700; line-height: 1.45; }
+    .highlight { color: #fef08a; }
+    .dia-badge { 
+      background: #fef08a; color: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 14px; margin: 0 4px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      gap: 16px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.06);
+      border: 1px solid #edf2f7;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .card.left { border-top: 5px solid #ff6b6b; }
+    .card.center { border-top: 5px solid #4c9aff; }
+    .card.right { border-top: 5px solid #22c55e; }
+
+    .card h2 {
+      font-size: 20px;
+      margin-bottom: 12px;
+      color: #12263a;
+    }
+
+    .card ul {
+      padding-left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 15px;
+      line-height: 1.55;
+      color: #334155;
+    }
+
+    .card li strong {
+      color: #0f172a;
+    }
+
+    .bad-text { color: #dc2626; }
+    .good-text { color: #16a34a; }
+
+    .state-machine {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .sm-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      margin-bottom: 30px;
+      z-index: 2;
+    }
+
+    .sm-row.row-3 {
+      display: grid;
+      grid-template-columns: 140px 1fr 140px 1fr 140px;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .sm-row.row-4 {
+      display: grid;
+      grid-template-columns: 140px 140px 140px 140px;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .sm-line {
+      position: absolute;
+      top: 50%; 
+      left: 0; 
+      right: 0;
+      height: 2px;
+      background: linear-gradient(to right, transparent, #cbd5e1 20%, #cbd5e1 80%, transparent);
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+
+    .node {
+      background: #fff;
+      border: 2px solid #3b82f6;
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-align: center;
+      width: 140px;
+      z-index: 3;
+      box-shadow: 0 4px 12px rgba(16,34,53,0.1);
+      position: relative;
+    }
+    .node.special { border-color: #f59e0b; background: #fffbeb; }
+    .node.io { border-color: #10b981; border-radius: 20px; background: #f0fdf4; }
+
+    .node-title { font-size: 13px; font-weight: bold; color: #0f172a; margin-bottom: 4px; font-family: monospace; }
+    .node-desc { font-size: 11px; color: #64748b; line-height: 1.3; }
+
+    .arrow-right::after { 
+      content: "→"; 
+      position: absolute; 
+      right: -20px; 
+      top: 50%; 
+      transform: translateY(-50%);
+      color: #64748b; 
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .arrow-down::before { 
+      content: "↓"; 
+      position: absolute; 
+      bottom: -25px; 
+      left: 50%; 
+      transform: translateX(-50%);
+      color: #64748b; 
+      font-size: 18px;
+      font-weight: bold;
+      z-index: 10;
+    }
+    .arrow-left::after { 
+      content: "←"; 
+      position: absolute; 
+      left: -20px; 
+      top: 50%; 
+      transform: translateY(-50%);
+      color: #64748b; 
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .config {
+      margin-top: 14px;
+      background: #0f172a;
+      color: #e5eefb;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+      overflow-x: auto;
+      overflow-y: visible;
+      white-space: nowrap;
+    }
+
+    .comment { color: #8aa1c1; }
+    .key { color: #93c5fd; }
+    .value { color: #facc15; font-weight: 700; }
+
+    .bottom-section {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .analogy-bar {
+      background: linear-gradient(to right, #f8fafc, #f1f5f9);
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #64748b;
+      border-radius: 16px;
+      padding: 10px 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .analogy-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #b45309;
+      margin-bottom: 8px;
+    }
+
+    .analogy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .analogy-item {
+      font-size: 12px;
+      color: #334155;
+      background: #fff;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .analogy-item strong {
+      color: #64748b;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .analogy-item.highlight {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .analogy-item.highlight strong { color: #2563eb; }
+
+    .takeaway {
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid #edf2f7;
+      box-shadow: 0 8px 24px rgba(16,34,53,0.05);
+      padding: 10px 14px;
+    }
+
+    .takeaway h3 {
+      font-size: 15px;
+      margin-bottom: 6px;
+      color: #12263a;
+      font-weight: 700;
+      display: block;
+    }
+
+    .takeaway .quote {
+      font-size: 15px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .takeaway .note {
+      font-size: 12px;
+      color: #5b6b7c;
+      line-height: 1.4;
+    }
+
+    .export-btn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #0f62fe, #4b8dff);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15,98,254,0.3);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .export-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(15,98,254,0.4);
+    }
+
+    .export-btn:active {
+      transform: translateY(0);
+    }
+
+    .home-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255,255,255,0.95);
+      color: #0f62fe;
+      border: 2px solid #0f62fe;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15,98,254,0.15);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .home-btn:hover {
+      background: #0f62fe;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(15,98,254,0.25);
+    }
+
+    .home-btn:active {
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1100px) {
+      .slide {
+        height: auto;
+        min-height: 92vh;
+        overflow: auto;
+      }
+      .main, .bottom-section {
+        grid-template-columns: 1fr;
+      }
+      .analogy-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="../../index.html" class="home-btn">←</a>
+  
+  <div class="slide">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="title-wrap">
+        <h1>一页图讲清楚：<span>lossless-claw</span> 凭什么敢叫无损记忆？</h1>
+        <p>ContextEngine 插件实现 —— 接管 7 大接口，实现按需无损的记忆管理</p>
+      </div>
+      <div class="tag">一页图讲清楚 02</div>
+    </div>
+
+    <!-- Summary (融入 DIA) -->
+    <div class="summary">
+      <div class="summary-text">
+        🎯 结论：作为 ContextEngine 的插件实现，它通过接管 7 大生命周期钩子，用状态机将记忆打包成极高的 <span class="dia-badge">信息抽象度 (DIA)</span>，<br>
+        构建了一本"带隐藏超链接的 DAG 动态目录"，让模型主动向下钻取，实现真正的 0 损失。
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+
+      <!-- Left: Pain points -->
+      <div class="card left">
+        <h2>❌ 传统方案的痛点</h2>
+        <ul>
+          <li><strong>滑动窗口（直接删）：</strong><br>
+            <span class="bad-text">做法：</span>满载后像切香肠一样截断。<br>
+            <span class="bad-text">后果：</span>抛弃底层逻辑，AI 彻底断片。
+          </li>
+          <li><strong>传统 RAG（容易幻觉）：</strong><br>
+            <span class="bad-text">做法：</span>把代码切碎算成向量盲搜。<br>
+            <span class="bad-text">后果：</span>代码逻辑有严格因果，RAG 破坏了原始上下文，经常“找错行”。
+          </li>
+        </ul>
+      </div>
+
+      <!-- Center: State Machine (7 Interfaces) -->
+      <div class="card center" style="border-top: 3px solid #38bdf8;">
+        <h2>⚙️ 核心架构：接管 7 大接口盘出 DAG 树</h2>
+        <div class="state-machine">
+
+          <div class="sm-row row-3">
+            <div class="sm-line"></div>
+            <div class="node arrow-right" style="border-color: #64748b;">
+              <div class="node-title">1. bootstrap</div>
+              <div class="node-desc">启动时建联 SQLite，加载旧树</div>
+            </div>
+            <span></span>
+            <div class="node special arrow-right">
+              <div class="node-title">2. ingest</div>
+              <div class="node-desc">拦截每句话，全量存入底层库</div>
+            </div>
+            <span></span>
+            <div class="node io arrow-down">
+              <div class="node-title">3. assemble</div>
+              <div class="node-desc">组装 "原话" + "顶层摘要" 发送</div>
+            </div>
+          </div>
+
+          <div class="sm-row row-4">
+            <div class="sm-line"></div>
+            <div class="node" style="border-color: #ef4444;">
+              <div class="node-title">7. lifecycle</div>
+              <div class="node-desc">关机前确保待建摘要落盘</div>
+            </div>
+            <div class="node arrow-left">
+              <div class="node-title">6. subagent</div>
+              <div class="node-desc">开分身时分配隔离的沙盒</div>
+            </div>
+            <div class="node arrow-left">
+              <div class="node-title">5. afterTurn</div>
+              <div class="node-desc">对话结束刷新游标与缓存</div>
+            </div>
+            <div class="node special arrow-left">
+              <div class="node-title">4. compact</div>
+              <div class="node-desc">快满时触发，高 DIA 提炼建树</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: Benefits -->
+      <div class="card right">
+        <h2>✅ 带来的爽点（按需展开）</h2>
+        <ul>
+          <li><strong>结构化路由：</strong><br>
+            <span class="good-text">机制：</span>发给模型的精简摘要里，暗藏着指向底层 SQLite 数据的锚点。
+          </li>
+          <li><strong>AI 亲自翻抽屉：</strong><br>
+            <span class="good-text">体验：</span>模型遇到要查证的变量，会调用工具顺着链接“降维展开”原始代码。
+          </li>
+          <li><strong>双赢：</strong>既不爆 Token，又保住细节！</li>
+        </ul>
+
+        <div class="config">
+          <div><span class="key">plugins</span>:</div>
+          <div>&nbsp;&nbsp;<span class="key">slots</span>:</div>
+          <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="key">contextEngine</span>: <span class="value">"lossless-claw"</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Section: Analogy + Takeaway -->
+    <div class="bottom-section">
+      <!-- Analogy -->
+      <div class="analogy-bar">
+        <div class="analogy-title">💡 核心对比：为什么不用传统的 RAG？</div>
+        <div class="analogy-grid">
+          <div class="analogy-item">
+            <strong>传统滑动窗口</strong>
+            像 <strong>碎纸机</strong>。抽屉满了就把最早的历史切碎扔掉，前置细节彻底断片。
+          </div>
+          <div class="analogy-item">
+            <strong>传统切块 RAG (Naive)</strong>
+            像 <strong>搜索结果页</strong>。把代码切碎靠相似度盲搜，丢失了严格的因果与作用域，极易缝合报错。
+          </div>
+          <div class="analogy-item highlight">
+            <strong>lossless-claw</strong>
+            像 <strong>带目录的内部 Wiki</strong>。先看高层摘要，模型觉得缺细节时，顺着锚点主动下钻展开原文。
+          </div>
+        </div>
+      </div>
+
+      <!-- Takeaway -->
+      <div class="takeaway">
+        <h3>🎯 一句话带走</h3>
+        <div class="quote">
+          "真正的无损，不是把几十万字硬塞给模型，而是给模型建一本带超链接的目录。"
+        </div>
+        <div class="note">
+          利用 DIA 理论提升摘要的抽象度，用 DAG 树锁死代码的因果关系。这种降维展开的思路，是 Vibe Coding 时代的最佳解法。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <button class="export-btn" onclick="exportAsImage()">📸 导出为图片</button>
+
+  <script>
+    async function exportAsImage() {
+      const button = document.querySelector('.export-btn');
+      button.textContent = '生成中...';
+      button.disabled = true;
+
+      try {
+        const slideElement = document.querySelector('.slide');
+        const canvas = await html2canvas(slideElement, {
+          scale: 2,
+          backgroundColor: null,
+          logging: false,
+          useCORS: true
+        });
+
+        const link = document.createElement('a');
+        link.download = 'lossless-claw-一页图讲清楚.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        button.textContent = '✅ 导出成功';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      } catch (error) {
+        console.error('导出失败:', error);
+        button.textContent = '❌ 导出失败';
+        setTimeout(() => {
+          button.textContent = '📸 导出为图片';
+          button.disabled = false;
+        }, 2000);
+      }
+    }
+  </script>
+</body>
+</html>

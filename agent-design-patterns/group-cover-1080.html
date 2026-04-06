@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent 设计模式 封面（1080x1080）</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+      background: #0b0c10;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .export-header { width: 1080px; display: flex; justify-content: space-between; align-items: center; }
+    .export-label { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: 0.5px; }
+    .export-btn {
+      background: linear-gradient(135deg, #7c3aed, #a78bfa);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(124,58,237,0.35);
+    }
+
+    .cover {
+      width: 1080px;
+      height: 1080px;
+      position: relative;
+      overflow: hidden;
+      border: 3px solid rgba(255,255,255,0.08);
+      box-shadow: 0 26px 70px rgba(0,0,0,0.55);
+      background:
+        radial-gradient(1100px 900px at 18% 20%, rgba(124,58,237,0.28) 0%, rgba(124,58,237,0) 58%),
+        radial-gradient(800px 800px at 88% 80%, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0) 52%),
+        radial-gradient(circle at 50% 30%, #181228 0%, #0b0c10 70%);
+    }
+
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 2px, transparent 2px);
+      background-size: 72px 72px;
+      opacity: 0.85;
+      z-index: 1;
+    }
+
+    .noise {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 25% 30%, rgba(167,139,250,0.08) 0, rgba(167,139,250,0) 42%),
+        radial-gradient(circle at 78% 18%, rgba(255,255,255,0.04) 0, rgba(255,255,255,0) 38%),
+        radial-gradient(circle at 65% 82%, rgba(245,158,11,0.07) 0, rgba(245,158,11,0) 44%);
+      mix-blend-mode: overlay;
+      opacity: 0.7;
+      z-index: 2;
+    }
+
+    .glow-top {
+      position: absolute;
+      top: -240px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 640px;
+      background: radial-gradient(ellipse at center, rgba(124,58,237,0.4) 0%, transparent 68%);
+      z-index: 2;
+    }
+
+    .ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.055);
+      z-index: 2;
+    }
+    .ring.r1 { width: 880px; height: 880px; right: -290px; top: -230px; border-color: rgba(167,139,250,0.1); }
+    .ring.r2 { width: 1200px; height: 1200px; left: -530px; bottom: -530px; border-color: rgba(245,158,11,0.07); }
+
+    .graph {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: 0.9;
+      pointer-events: none;
+    }
+
+    .layer {
+      position: relative;
+      z-index: 10;
+      height: 100%;
+      padding: 74px 80px 70px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tag {
+      align-self: flex-start;
+      display: inline-flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 22px;
+      border-radius: 999px;
+      color: #fff;
+      font-weight: 900;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, rgba(124,58,237,0.95), rgba(167,139,250,0.9));
+      border: 2px solid rgba(255,255,255,0.38);
+      box-shadow: 0 14px 34px rgba(124,58,237,0.3);
+      font-size: 22px;
+    }
+    .tag .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.95);
+      box-shadow: 0 0 0 6px rgba(255,255,255,0.18);
+    }
+
+    .title {
+      margin-top: 58px;
+      color: #fff;
+      font-weight: 950;
+      letter-spacing: 3px;
+      line-height: 1.1;
+      text-shadow: 0 12px 44px rgba(0,0,0,0.85);
+      font-size: 82px;
+    }
+
+    .title .en {
+      display: block;
+      font-size: 38px;
+      letter-spacing: 7px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.82);
+      margin-bottom: 16px;
+    }
+
+    .title .hl {
+      display: inline-block;
+      background: linear-gradient(90deg, #a78bfa, #f59e0b);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(167,139,250,0.6));
+    }
+
+    .subtitle {
+      margin-top: 24px;
+      font-size: 31px;
+      font-weight: 800;
+      color: rgba(241,245,249,0.88);
+      letter-spacing: 1.5px;
+      line-height: 1.45;
+    }
+
+    .points {
+      margin-top: 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 28px 30px;
+      border-radius: 26px;
+      background: rgba(255,255,255,0.055);
+      border: 2px solid rgba(167,139,250,0.28);
+      backdrop-filter: blur(18px);
+      box-shadow: inset 0 0 40px rgba(124,58,237,0.09);
+      width: 100%;
+    }
+
+    .point {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .badge {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 950;
+      font-size: 22px;
+      color: #a78bfa;
+      background: rgba(124,58,237,0.15);
+      border: 3px solid rgba(167,139,250,0.85);
+      flex-shrink: 0;
+    }
+
+    .badge.gold {
+      color: #f59e0b;
+      background: rgba(245,158,11,0.13);
+      border-color: rgba(245,158,11,0.8);
+    }
+
+    .point span {
+      font-size: 29px;
+      font-weight: 900;
+      color: rgba(241,245,249,0.95);
+      letter-spacing: 1px;
+      line-height: 1.35;
+    }
+
+    .point span b {
+      color: #a78bfa;
+      font-weight: 950;
+    }
+
+    .point span b.gold {
+      color: #fbbf24;
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+      padding-top: 26px;
+      border-top: 2px dashed rgba(167,139,250,0.28);
+    }
+
+    .punch {
+      font-size: 38px;
+      font-weight: 950;
+      letter-spacing: 2px;
+      color: #a78bfa;
+      text-shadow: 0 0 28px rgba(167,139,250,0.55);
+      line-height: 1.28;
+    }
+
+    .meta {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+      color: rgba(255,255,255,0.78);
+      font-weight: 800;
+      letter-spacing: 0.6px;
+    }
+
+    .meta .line {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.42);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(10px);
+      font-size: 16px;
+    }
+
+    .meta .k { color: rgba(255,255,255,0.62); font-weight: 900; }
+    .meta .v { color: rgba(255,255,255,0.92); font-weight: 950; }
+  </style>
+</head>
+<body>
+  <div class="export-header">
+    <div class="export-label">🧩 1080x1080 封面（agent-design-patterns）</div>
+    <button class="export-btn" onclick="exportCover('cover','agent-design-patterns-cover-1080.jpg')">导出 JPG（&lt;5MB）</button>
+  </div>
+
+  <div class="cover" id="cover">
+    <div class="glow-top"></div>
+    <div class="grid-bg"></div>
+    <div class="noise"></div>
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+
+    <!-- Agent node-graph decorative SVG -->
+    <svg class="graph" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gv" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#a78bfa" stop-opacity="0.9" />
+          <stop offset="1" stop-color="#7c3aed" stop-opacity="0.3" />
+        </linearGradient>
+        <linearGradient id="ga" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f59e0b" stop-opacity="0.75" />
+          <stop offset="1" stop-color="#fbbf24" stop-opacity="0.2" />
+        </linearGradient>
+        <linearGradient id="gva" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#a78bfa" stop-opacity="0.7" />
+          <stop offset="1" stop-color="#f59e0b" stop-opacity="0.5" />
+        </linearGradient>
+        <filter id="nodeGlow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="4" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="lineGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2.5" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- Top-left agent graph cluster -->
+      <g filter="url(#lineGlow)">
+        <line x1="108" y1="185" x2="310" y2="270" stroke="url(#gv)" stroke-width="3" stroke-linecap="round" />
+        <line x1="310" y1="270" x2="480" y2="210" stroke="url(#gv)" stroke-width="3" stroke-linecap="round" opacity="0.7" />
+        <line x1="310" y1="270" x2="340" y2="420" stroke="url(#gva)" stroke-width="2.5" stroke-linecap="round" opacity="0.65" />
+
+        <line x1="940" y1="280" x2="780" y2="340" stroke="url(#ga)" stroke-width="3.5" stroke-linecap="round" opacity="0.8" />
+        <line x1="780" y1="340" x2="660" y2="290" stroke="url(#ga)" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+        <line x1="780" y1="340" x2="820" y2="490" stroke="url(#gva)" stroke-width="2.5" stroke-linecap="round" opacity="0.5" />
+
+        <line x1="130" y1="880" x2="290" y2="800" stroke="url(#gv)" stroke-width="3.5" stroke-linecap="round" opacity="0.75" />
+        <line x1="290" y1="800" x2="440" y2="840" stroke="url(#gva)" stroke-width="3" stroke-linecap="round" opacity="0.55" />
+        <line x1="290" y1="800" x2="310" y2="680" stroke="url(#gv)" stroke-width="2.5" stroke-linecap="round" opacity="0.5" />
+
+        <line x1="960" y1="820" x2="820" y2="760" stroke="url(#ga)" stroke-width="3.5" stroke-linecap="round" opacity="0.7" />
+        <line x1="820" y1="760" x2="700" y2="810" stroke="url(#ga)" stroke-width="2.5" stroke-linecap="round" opacity="0.5" />
+
+        <path d="M540 120 V210" stroke="rgba(255,255,255,0.15)" stroke-width="3" stroke-linecap="round" />
+      </g>
+
+      <!-- Agent nodes -->
+      <g filter="url(#nodeGlow)">
+        <!-- Top-left cluster: violet -->
+        <circle cx="108" cy="185" r="10" fill="#a78bfa" fill-opacity="0.92" />
+        <circle cx="310" cy="270" r="13" fill="#7c3aed" fill-opacity="0.8" stroke="#a78bfa" stroke-width="2.5" stroke-opacity="0.9" />
+        <circle cx="480" cy="210" r="8" fill="#a78bfa" fill-opacity="0.7" />
+        <circle cx="340" cy="420" r="7" fill="#7c3aed" fill-opacity="0.6" />
+
+        <!-- Top-right cluster: amber -->
+        <circle cx="940" cy="280" r="10" fill="#f59e0b" fill-opacity="0.88" />
+        <circle cx="780" cy="340" r="13" fill="#d97706" fill-opacity="0.75" stroke="#f59e0b" stroke-width="2.5" stroke-opacity="0.85" />
+        <circle cx="660" cy="290" r="8" fill="#fbbf24" fill-opacity="0.65" />
+        <circle cx="820" cy="490" r="7" fill="#f59e0b" fill-opacity="0.5" />
+
+        <!-- Bottom-left cluster: violet -->
+        <circle cx="130" cy="880" r="10" fill="#a78bfa" fill-opacity="0.82" />
+        <circle cx="290" cy="800" r="13" fill="#7c3aed" fill-opacity="0.72" stroke="#a78bfa" stroke-width="2.5" stroke-opacity="0.8" />
+        <circle cx="440" cy="840" r="8" fill="#a78bfa" fill-opacity="0.6" />
+        <circle cx="310" cy="680" r="7" fill="#7c3aed" fill-opacity="0.55" />
+
+        <!-- Bottom-right cluster: amber -->
+        <circle cx="960" cy="820" r="10" fill="#f59e0b" fill-opacity="0.78" />
+        <circle cx="820" cy="760" r="12" fill="#d97706" fill-opacity="0.68" stroke="#f59e0b" stroke-width="2" stroke-opacity="0.75" />
+        <circle cx="700" cy="810" r="7" fill="#fbbf24" fill-opacity="0.5" />
+
+        <!-- Center top anchor -->
+        <circle cx="540" cy="120" r="8" fill="rgba(255,255,255,0.28)" />
+        <circle cx="540" cy="210" r="7" fill="#a78bfa" fill-opacity="0.55" />
+      </g>
+
+      <!-- Cross-axis faint guidelines -->
+      <g opacity="0.3">
+        <path d="M0 540 H1080" stroke="rgba(255,255,255,0.055)" stroke-width="2" />
+        <path d="M540 0 V1080" stroke="rgba(255,255,255,0.055)" stroke-width="2" />
+      </g>
+    </svg>
+
+    <div class="layer">
+      <div class="tag"><span class="dot"></span><span>Agent 设计模式 · 工程蓝图</span></div>
+
+      <div class="title">
+        <span class="en">AGENT DESIGN PATTERNS</span>
+        <span class="hl">可靠、可控、可组合</span>
+      </div>
+
+      <div class="subtitle">ReAct · 记忆 · 工具 · 多智能体 · 规划 —— 构建生产级 Agent 的设计蓝图</div>
+
+      <div class="points">
+        <div class="point">
+          <div class="badge">01</div>
+          <span><b>ReAct</b>：推理-行动-观测闭环，自我纠偏</span>
+        </div>
+        <div class="point">
+          <div class="badge">02</div>
+          <span><b>Memory</b>：短/长/外部记忆分层管理</span>
+        </div>
+        <div class="point">
+          <div class="badge gold">03</div>
+          <span><b class="gold">Tool Use</b>：精准扩展 Agent 能力边界</span>
+        </div>
+        <div class="point">
+          <div class="badge gold">04</div>
+          <span><b class="gold">Multi-Agent</b>：编排协作，攻克复杂任务</span>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="punch">从"提示词"<br />到"可信赖的智能体"</div>
+        <div class="meta">
+          <div class="line"><span class="k">尺寸</span><span class="v">1080×1080</span></div>
+          <div class="line"><span class="k">合集</span><span class="v">Agent 设计模式</span></div>
+          <div class="line"><span class="k">系列</span><span class="v">one-page-tech</span></div>
+          <div class="line"><span class="k">版本</span><span class="v">v1</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function exportCover(id, fn) {
+      const el = document.getElementById(id);
+      const btn = event.target;
+      const ot = btn.textContent;
+      const MAX = 5 * 1024 * 1024;
+
+      btn.textContent = '导出中...';
+      btn.disabled = true;
+
+      const attempts = [
+        { scale: 2, quality: 0.9 },
+        { scale: 2, quality: 0.82 },
+        { scale: 1.8, quality: 0.8 },
+        { scale: 1.6, quality: 0.78 },
+        { scale: 1.5, quality: 0.75 },
+      ];
+
+      try {
+        for (let i = 0; i < attempts.length; i++) {
+          const { scale, quality } = attempts[i];
+          btn.textContent = `导出中... (${i + 1}/${attempts.length})`;
+
+          const c = await html2canvas(el, {
+            scale,
+            backgroundColor: '#0b0c10',
+            logging: false,
+            useCORS: true,
+          });
+
+          const blob = await new Promise((resolve) =>
+            c.toBlob((b) => resolve(b), 'image/jpeg', quality)
+          );
+
+          if (!blob) continue;
+          if (blob.size > MAX && i < attempts.length - 1) continue;
+
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.download = fn;
+          a.href = u;
+          a.click();
+          URL.revokeObjectURL(u);
+
+          btn.textContent = blob.size <= MAX ? '✅ 导出成功' : '⚠️ 已导出（可能>5MB）';
+          setTimeout(() => {
+            btn.textContent = ot;
+            btn.disabled = false;
+          }, 1800);
+          return;
+        }
+
+        btn.textContent = '❌ 失败';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 1600);
+      } catch (e) {
+        btn.textContent = '❌ 失败';
+        setTimeout(() => { btn.textContent = ot; btn.disabled = false; }, 1600);
+      }
+    }
+  </script>
+</body>
+</html>
