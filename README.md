@@ -8,6 +8,6 @@
 
 ## 内容分类
 
-- **上下文工程** — ContextEngine、lossless-claw、Claude Code 记忆设计等（9 篇）
-- **软件工程新范式** — SDD、Harness Engineering、Anthropic 长任务设计等（6 篇）
-- **Agent 设计模式** — ReAct、Plan-and-Execute（2 篇）
+- **上下文工程** — ContextEngine、lossless-claw、Claude Code 记忆设计等
+- **软件工程新范式** — SDD、Harness Engineering、Anthropic 长任务设计等
+- **Agent 设计模式** — ReAct、Plan-and-Execute、渐进式披露、Reflexion、Multi-Agent
