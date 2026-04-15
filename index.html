@@ -423,17 +423,17 @@
       <button class="sb-item active" onclick="navTo('ctx',this)">
         <span class="sb-ico">📚</span>
         <span class="sb-label">上下文工程</span>
-        <span class="sb-count">8</span>
+        <span class="sb-count" id="ctxCount">0</span>
       </button>
       <button class="sb-item" onclick="navTo('se',this)">
         <span class="sb-ico">🧩</span>
         <span class="sb-label">软件工程新范式</span>
-        <span class="sb-count">6</span>
+        <span class="sb-count" id="seCount">0</span>
       </button>
       <button class="sb-item" onclick="navTo('adp',this)">
         <span class="sb-ico">🤖</span>
         <span class="sb-label">Agent 设计模式</span>
-        <span class="sb-count">5</span>
+        <span class="sb-count" id="adpCount">0</span>
       </button>
 
     </nav>
@@ -483,89 +483,7 @@
       <div class="sec-head">
         <div class="sec-label">上下文工程</div>
       </div>
-      <div class="post-list collapsed">
-
-        <a href="context-engineering/01-context-engine/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 01 期</div><div class="pdate">03-15</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">ContextEngine 到底开放了什么？</div>
-            <div class="pexcerpt">OpenClaw 史诗级架构升级：从硬编码到可插拔的记忆底座</div>
-            <div class="ptags"><span class="pt">架构设计</span><span class="pt">插件系统</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/02-lossless-claw/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 02 期</div><div class="pdate">03-15</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">lossless-claw 凭什么敢叫无损记忆？</div>
-            <div class="pexcerpt">接管 7 大生命周期钩子，用状态机实现真正的 0 损失记忆管理</div>
-            <div class="ptags"><span class="pt">状态机</span><span class="pt">DIA 理论</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/03-windsurf-context-mem/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 03 期</div><div class="pdate">03-17</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Windsurf 是如何做到「既记得住，又不乱看」的？</div>
-            <div class="pexcerpt">记忆模块 + RAG 上下文引擎：让模型每一步只看到最有用的那 1%</div>
-            <div class="ptags"><span class="pt">Memory</span><span class="pt">RAG</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/04-openviking/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 04 期</div><div class="pdate">03-18</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">lossless-claw × OpenViking = 完整的 AI 大脑</div>
-            <div class="pexcerpt">会话内无损记忆 + 跨会话长期记忆，两个插槽一行配置，AI 首次拥有连续记忆</div>
-            <div class="ptags"><span class="pt">长期记忆</span><span class="pt">插槽协作</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/05-claude-code/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 05 期</div><div class="pdate">03-21</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Claude Code 凭什么不靠预建索引，也能精准改代码？</div>
-            <div class="pexcerpt">无索引架构的秘密：子智能体搜索 + 多层过滤，每次只看最相关的代码</div>
-            <div class="ptags"><span class="pt">Claude Code</span><span class="pt">无索引架构</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/06-claude-skills/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 06 期</div><div class="pdate">03-21</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">一张图讲透 Claude Code 的 Skills 渐进披露黑科技</div>
-            <div class="pexcerpt">Memory Files 渐进披露 → Skills YAML 标准化，Main Agent 调度 0 改动，披露机制产品化升级</div>
-            <div class="ptags"><span class="pt">Skills</span><span class="pt">渐进披露</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/07-memory-architecture/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 07 期</div><div class="pdate">03-23</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">AI Agent 完整记忆架构设计：从会话无损到跨会话联想</div>
-            <div class="pexcerpt">借 ContextEngine 与 OpenViking，实现全量存 + 摘要发，打通会话内短期无损上下文与全局长期记忆</div>
-            <div class="ptags"><span class="pt">记忆架构</span><span class="pt">4 层抽象</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="context-engineering/08-claude-code-memory-design/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum">第 08 期</div><div class="pdate">03-25</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">只存不可派生的认知</div>
-            <div class="pexcerpt">Claude Code 记忆设计：三层机制保证存得准、取得准、不过期</div>
-            <div class="ptags"><span class="pt">记忆设计</span><span class="pt">源码解读</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-        <div class="sec-toggle"><button onclick="toggleSection(this)">展开全部 (8 篇)</button></div>
-      </div>
+      <div class="post-list collapsed" id="ctxList"></div>
     </section>
 
     <!-- ── 软件工程新范式 ── -->
@@ -573,69 +491,7 @@
       <div class="sec-head">
         <div class="sec-label">软件工程新范式</div>
       </div>
-      <div class="post-list collapsed">
-
-        <a href="software-engineering/01-sdd-try/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum b">SE-01</div><div class="pdate">03-24</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">SDD 实战入门：团队经验分享</div>
-            <div class="pexcerpt">标准理论 + 团队实战经验：提效 30%，编码与自测自动化 80%</div>
-            <div class="ptags"><span class="pt">SDD</span><span class="pt">Spec</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="software-engineering/02-harness-engineering/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum b">SE-02</div><div class="pdate">03-27</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Harness Engineering 深度拆解</div>
-            <div class="pexcerpt">OpenAI 内部激进实验：人类 0 行手写，AI 自治交付 100 万行代码</div>
-            <div class="ptags"><span class="pt">Harness</span><span class="pt">Agent</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-
-        <a href="software-engineering/03-harness-anthropic-0324/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum v">SE-03</div><div class="pdate">03-28</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Harness 设计：让长任务应用开发不失控</div>
-            <div class="pexcerpt">为什么长任务开发中 Agent 容易失控？从 Anthropic 实践看三层 Harness 如何驯服长任务</div>
-            <div class="ptags"><span class="pt">Anthropic</span><span class="pt">Harness</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-        <a href="software-engineering/03-harness-design-long-running-apps/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum v">SE-04</div><div class="pdate">03-29</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Anthropic Harness 设计拆解</div>
-            <div class="pexcerpt">从单体 Agent 失控到三层 Harness：把长任务开发变成可验证交付</div>
-            <div class="ptags"><span class="pt">Anthropic</span><span class="pt">Harness</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="software-engineering/04-effective-harnesses-for-long-running-agents/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum a">SE-05</div><div class="pdate">03-31</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">长任务 Agent 稳定交付的底层机制</div>
-            <div class="pexcerpt">决定 Agent 上限的不是模型，是 Harness：交接资产、增量纪律、端到端验收三层机制全拆解</div>
-            <div class="ptags"><span class="pt">Anthropic</span><span class="pt">长任务</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="software-engineering/05-claude-code-inner-is-harness/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum v">SE-06</div><div class="pdate">04-01</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Claude Code 里面，就是一套 Harness</div>
-            <div class="pexcerpt">源码意外流出，打开一看全是 Harness：外面工程师搭 Harness，里面还是 Harness</div>
-            <div class="ptags"><span class="pt">Claude Code</span><span class="pt">Harness</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-        <div class="sec-toggle"><button onclick="toggleSection(this)">展开全部 (6 篇)</button></div>
-      </div>
+      <div class="post-list collapsed" id="seList"></div>
     </section>
 
     <!-- ── Agent 设计模式 ── -->
@@ -643,59 +499,7 @@
       <div class="sec-head">
         <div class="sec-label">Agent 设计模式</div>
       </div>
-      <div class="post-list collapsed">
-
-        <a href="agent-design-patterns/01-ReAct/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum t">ADP-01</div><div class="pdate">04-03</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">ReAct：推理与行动的协同</div>
-            <div class="pexcerpt">从 2022 年普林斯顿论文到 Claude Code 的 queryLoop——翻源码才真正看懂 ReAct</div>
-            <div class="ptags"><span class="pt">ReAct</span><span class="pt">Claude Code</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="agent-design-patterns/02-Plan-And-Execute/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum t">ADP-02</div><div class="pdate">04-05</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Plan-and-Execute：先规划，再执行</div>
-            <div class="pexcerpt">ReAct 跑不了长任务，Plan-and-Execute 怎么解的——LangChain 架构分离 vs Claude Code 状态切换，两种落地对比</div>
-            <div class="ptags"><span class="pt">Plan-and-Execute</span><span class="pt">Claude Code</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="agent-design-patterns/03-Progressive-Disclosure/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum t">ADP-03</div><div class="pdate">04-07</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">渐进式披露：先少给，再展开，再收回</div>
-            <div class="pexcerpt">从 HCI 论文到 Claude Code Skills——为什么有限上下文里的大规模能力系统必须用渐进式披露来管理</div>
-            <div class="ptags"><span class="pt">渐进披露</span><span class="pt">Claude Code</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="agent-design-patterns/04-Reflexion/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum t">ADP-04</div><div class="pdate">04-09</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Reflexion：让 Agent 从失败中学习</div>
-            <div class="pexcerpt">从 NeurIPS 2023 论文到 Claude Code 源码——拆解 Reflexion 如何把失败原因变成可复用反馈的纠错回路</div>
-            <div class="ptags"><span class="pt">Reflexion</span><span class="pt">Claude Code</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-
-        <a href="agent-design-patterns/05-multi-agent/index.html" class="post-row">
-          <div class="post-meta"><div class="pnum t">ADP-05</div><div class="pdate">04-12</div><div class="pstatus live">已发布</div></div>
-          <div class="post-body">
-            <div class="ptitle">Multi-Agent：多个 while(true) 同时在转</div>
-            <div class="pexcerpt">从 AutoGen 论文到 Claude Code 源码——拆解 Orchestrator-Worker 模式：上下文隔离、并行执行、专业分工</div>
-            <div class="ptags"><span class="pt">Multi-Agent</span><span class="pt">Claude Code</span></div>
-          </div>
-          <div class="parrow">→</div>
-        </a>
-        <div class="sec-toggle"><button onclick="toggleSection(this)">展开全部 (5 篇)</button></div>
-      </div>
+      <div class="post-list collapsed" id="adpList"></div>
     </section>
 
 
@@ -719,6 +523,7 @@
     </div>
   </div>
 
+  <script src="posts-data.js"></script>
   <script>
     (function(){var s=document.querySelector('.sb-bottom img');if(s){var c=s.cloneNode();c.style.width='100%';c.style.display='block';document.getElementById('qrBig').appendChild(c);}})();
     const sb = document.getElementById('sidebar');
@@ -753,6 +558,36 @@
       btn.textContent = isCollapsed ? '展开全部 (' + total + ' 篇)' : '收起';
     }
 
+    function toDateKey(mmdd) {
+      const [month, day] = mmdd.split('-').map(Number);
+      return month * 100 + day;
+    }
+
+    function renderPostRow(item) {
+      const pnumClass = item.pnumClass ? ' ' + item.pnumClass : '';
+      const tags = item.tags.map(tag => '<span class="pt">' + tag + '</span>').join('');
+      return '<a href="' + item.href + '" class="post-row">'
+        + '<div class="post-meta"><div class="pnum' + pnumClass + '">' + item.pnum + '</div><div class="pdate">' + item.pdate + '</div><div class="pstatus live">已发布</div></div>'
+        + '<div class="post-body">'
+        + '<div class="ptitle">' + item.title + '</div>'
+        + '<div class="pexcerpt">' + item.excerpt + '</div>'
+        + '<div class="ptags">' + tags + '</div>'
+        + '</div>'
+        + '<div class="parrow">→</div>'
+        + '</a>';
+    }
+
+    function renderHomepageSections() {
+      Object.values(homepageSections).forEach(section => {
+        const list = document.getElementById(section.listId);
+        const count = document.getElementById(section.countId);
+        const items = [...section.items].sort((a, b) => toDateKey(b.pdate) - toDateKey(a.pdate) || b.seq - a.seq);
+        list.innerHTML = items.map(renderPostRow).join('')
+          + '<div class="sec-toggle"><button onclick="toggleSection(this)">展开全部 (' + items.length + ' 篇)</button></div>';
+        count.textContent = String(items.length);
+      });
+    }
+
     function navTo(id, btn) {
       document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
       btn.classList.add('active');
@@ -779,6 +614,7 @@
     }
 
     (function() {
+      renderHomepageSections();
       applyTheme('dark');
     })();
   </script>
